@@ -20,6 +20,7 @@ import io.github.cdisvm.compiler.Instruction;
 import io.github.cdisvm.compiler.MethodType;
 import io.github.cdisvm.compiler.ParameterKind;
 import io.github.cdisvm.compiler.StackMetadata;
+import io.github.cdisvm.compiler.opcode.LoadConstant;
 import io.github.cdisvm.compiler.opcode.LoadLocal;
 import io.github.cdisvm.compiler.opcode.ReturnValue;
 import io.github.cdisvm.runtime.PyStr;
@@ -67,6 +68,35 @@ class CDisCompilerTest {
         var callable = compiler.compile(bytecode);
         var expected = "test data";
         assertThat(callable.getCallBuilder().$appendArgument(new PyStr(expected)).call())
+                .isInstanceOf(PyStr.class)
+                .extracting(pyObject -> ((PyStr) pyObject).value())
+                .isEqualTo(expected);
+    }
+
+    @Test
+    void constants() {
+        var bytecode = new Bytecode(
+                "test",
+                new FunctionSignature(List.of(), PyType.of(PyStr.class)),
+                FunctionType.FUNCTION,
+                MethodType.VIRTUAL,
+                0,
+                List.of(
+                        new Instruction(new LoadConstant(new PyStr("return")), 0, 0),
+                        new Instruction(new ReturnValue(), 1, 1)
+                ),
+                List.of(
+                        new StackMetadata(null, null, null, false),
+                        new StackMetadata(null, null, null, false)),
+                List.of(),
+                null,
+                Map.of(),
+                Map.of(),
+                Set.of()
+        );
+        var callable = compiler.compile(bytecode);
+        var expected = "return";
+        assertThat(callable.getCallBuilder().call())
                 .isInstanceOf(PyStr.class)
                 .extracting(pyObject -> ((PyStr) pyObject).value())
                 .isEqualTo(expected);
