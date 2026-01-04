@@ -1,0 +1,23 @@
+# Python compiled files
+*.pyc
+__pycache__
+/*.egg-info
+/dist
+
+# Java compiled files
+target
+
+# Eclipse, Netbeans and IntelliJ files
+/.*
+!/.github
+!/.ci
+!.gitignore
+!.gitattributes
+!/.mvn
+/nbproject
+*.ipr
+*.iws
+*.iml
+
+# Repository wide ignore mac DS_Store files
+.DS_Store
