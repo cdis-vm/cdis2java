@@ -12,13 +12,15 @@ import io.github.cdisvm.compiler.opcode.HasTarget;
 import io.github.cdisvm.compiler.opcode.HasVariable;
 
 @NullMarked
-public record CompilationRun(ClassDesc callableClassDesc,
+public record CompilationRun(CDisCompiler compiler,
+                             ClassDesc callableClassDesc,
                              CodeBuilder codeBuilder,
                              Bytecode bytecode,
                              Map<Integer, Label> bytecodeIndexToLabel,
                              Map<String, Integer> variableNameToSlot,
                              int syntheticStart) {
     public static CompilationRun init(
+            CDisCompiler compiler,
             ClassDesc callableClassDesc,
             CodeBuilder codeBuilder,
             Bytecode bytecode,
@@ -50,7 +52,7 @@ public record CompilationRun(ClassDesc callableClassDesc,
             bytecodeIndexToLabel.computeIfAbsent(exceptionHandler.handlerBytecodeIndex(), _ -> codeBuilder.newLabel());
         }
 
-        return new CompilationRun(callableClassDesc, codeBuilder, bytecode, bytecodeIndexToLabel, variableNameToSlot, reservedSlots + variableNameToSlot.size());
+        return new CompilationRun(compiler, callableClassDesc, codeBuilder, bytecode, bytecodeIndexToLabel, variableNameToSlot, reservedSlots + variableNameToSlot.size());
     }
 
     public int getVariableSlot(String variableName) {

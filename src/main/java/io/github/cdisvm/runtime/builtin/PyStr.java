@@ -1,10 +1,14 @@
-package io.github.cdisvm.runtime;
+package io.github.cdisvm.runtime.builtin;
 
 import java.lang.classfile.CodeBuilder;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
 
+import io.github.cdisvm.compiler.CD;
 import io.github.cdisvm.compiler.CDisCompiler;
+import io.github.cdisvm.runtime.PyAttributes;
+import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyType;
 
 public record PyStr(String value) implements PyConstant {
     @Override
@@ -13,7 +17,7 @@ public record PyStr(String value) implements PyConstant {
         codeBuilder.dup();
         codeBuilder.loadConstant(value);
         codeBuilder.invokespecial(ClassDesc.of(PyStr.class.getCanonicalName()), "<init>",
-                MethodTypeDesc.of(CDisCompiler.VOID_CD, ClassDesc.of(String.class.getCanonicalName())));
+                MethodTypeDesc.of(CD.VOID, ClassDesc.of(String.class.getCanonicalName())));
     }
 
     @Override
@@ -22,12 +26,17 @@ public record PyStr(String value) implements PyConstant {
     }
 
     @Override
-    public PyAttributes attributes() {
+    public PyAttributes pyAttributes() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public PyType type() {
+    public PyType pyType() {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public PyBool pyTruth() {
+        return PyBool.of(value.isEmpty());
     }
 }
