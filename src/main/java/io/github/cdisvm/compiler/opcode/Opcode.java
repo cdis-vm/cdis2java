@@ -31,7 +31,7 @@ public sealed interface Opcode
         permits AppendPositionalArg, AsBool, BinaryOp, BuildSlice, CallWithBuilder, CreateCallBuilder,
         DelegateOrRestoreGeneratorState, DeleteAttr, DeleteCell, DeleteGlobal, DeleteItem, DeleteLocal, DictPut, DictUpdate,
         Dup, DupX1, ExtendKeywordArgs, ExtendPositionalArgs, FormatValue, GetAsyncIterator, GetAsyncNext, GetAwaitableIterator,
-        GetItem, GetIterator, GetNextElseJumpTo, GetType, IfFalse, IfTrue, ImportModule, IsContainedIn, IsSameAs,
+        GetItem, GetIterator, GetNextElseJumpTo, GetType, IfFalse, IfTrue, ImportModule, InplaceBinaryOp, IsContainedIn, IsSameAs,
         JoinStringValues, JumpIfNotMatchExceptType, JumpTo, ListAppend, ListExtend, ListToTuple, LoadAndBindInnerClass,
         LoadAndBindInnerFunction, LoadAndBindInnerGenerator, LoadAttr, LoadCell, LoadConstant, LoadGlobal, LoadLocal,
         LoadObjectTypeAttr, LoadSynthetic, LoadTypeAttrOrGlobal, MatchClass, MatchMapping, MatchSequence, NewDict, NewList,

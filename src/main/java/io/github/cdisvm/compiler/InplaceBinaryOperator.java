@@ -1,6 +1,6 @@
 package io.github.cdisvm.compiler;
 
-public enum BinaryOperator {
+public enum InplaceBinaryOperator {
     Add("Add"),
     Sub("Sub"),
     Mult("Mult"),
@@ -13,17 +13,11 @@ public enum BinaryOperator {
     BitOr("BitOr"),
     BitXor("BitXor"),
     BitAnd("BitAnd"),
-    MatMult("MatMult"),
-    Eq("Eq"),
-    NotEq("NotEq"),
-    Lt("Lt"),
-    LtE("LtE"),
-    Gt("Gt"),
-    GtE("GtE");
+    MatMult("MatMult");
 
     private final String id;
 
-    BinaryOperator(String id) {
+    InplaceBinaryOperator(String id) {
         this.id = id;
     }
 
@@ -31,8 +25,8 @@ public enum BinaryOperator {
         return id;
     }
 
-    public static BinaryOperator fromId(String id) {
-        for (BinaryOperator op : BinaryOperator.values()) {
+    public static InplaceBinaryOperator fromId(String id) {
+        for (InplaceBinaryOperator op : InplaceBinaryOperator.values()) {
             if (op.getId().equals(id)) {
                 return op;
             }
