@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 
 [project]
-name = "cdis"
+name = "cdis2java"
 version = "0.0.1a0"
 requires-python = ">=3.10"
 description = "convert cdis bytecode to JVM bytecode"
