@@ -362,3 +362,25 @@ def compile_function(func, jar_path='target/cdis2java-999-SNAPSHOT.jar'):
     JCDisCompiler = _jclass("io.github.cdisvm.compiler.CDisCompiler")
     compiler = JCDisCompiler()
     return compiler.compile(java_bytecode)
+
+
+def java_value(value):
+    return _convert_py_constant(value)
+
+
+def py_value(value):
+    PyBool = _jclass("io.github.cdisvm.runtime.builtin.PyBool")
+    PyInt = _jclass("io.github.cdisvm.runtime.builtin.PyInt")
+    PyStr = _jclass("io.github.cdisvm.runtime.builtin.PyStr")
+    PyNone = _jclass("io.github.cdisvm.runtime.builtin.PyNone")
+
+    if isinstance(value, PyBool):
+        return value.value()
+    if isinstance(value, PyInt):
+        return value.value().longValue()
+    if isinstance(value, PyStr):
+        return value.value()
+    if isinstance(value, PyNone):
+        return None
+
+    raise ValueError(f"Unsupported constant type: {type(value)}")
