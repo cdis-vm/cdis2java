@@ -1,8 +1,8 @@
 from cdis2java import compile_function, java_value, py_value
 
-def adapt_function(function):
+def create_function_match_asserter(function):
     adapted = compile_function(function)
-    def adapted_function(*args, **kwargs):
+    def asserting_output_function(*args, **kwargs):
         nonlocal adapted, function
         call_builder = adapted.pyCallBuilder()
         for arg in args:
@@ -12,4 +12,4 @@ def adapt_function(function):
         out = py_value(adapted.pyCall(call_builder))
         assert out == function(*args, **kwargs)
         return out
-    return adapted_function
+    return asserting_output_function
