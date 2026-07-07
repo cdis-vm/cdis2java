@@ -31,6 +31,18 @@ def _convert_py_constant(value):
     if value is None:
         PyNone = _jclass("io.github.cdisvm.runtime.builtin.PyNone")
         return PyNone.INSTANCE
+    if isinstance(value, list):
+        PyList = _jclass("io.github.cdisvm.runtime.builtin.PyList")
+        out = PyList()
+        for item in value:
+            out.add(_convert_py_constant(item))
+        return out
+    if isinstance(value, tuple):
+        PyTuple = _jclass("io.github.cdisvm.runtime.builtin.PyTuple")
+        out = PyTuple()
+        for item in value:
+            out.add(_convert_py_constant(item))
+        return out
     raise ValueError(f"Unsupported constant type: {type(value)}")
 
 
@@ -278,6 +290,7 @@ def _convert_parameter_kind(kind):
 
 
 def _convert_signature(sig):
+    import inspect
     JFunctionSignature = _jclass("io.github.cdisvm.compiler.FunctionSignature")
     builder = JFunctionSignature.builder()
     PyType = _jclass("io.github.cdisvm.runtime.PyType")
@@ -293,10 +306,16 @@ def _convert_signature(sig):
             i,
             name,
             kind,
-            PyType.of(PyObject),
+            PyType.of(PyObject),  # TODO: convert param.annotation to type
             default,
         )
-        builder.parameters().add(fp)
+        builder.param(fp)
+
+    if sig.return_annotation is not inspect.Signature.empty:
+        # TODO: convert sig.return_annotation to type
+        builder.returningType(PyType.of(PyObject))
+    else:
+        builder.returningType(PyType.of(PyObject))
 
     return builder.build()
 
@@ -373,6 +392,8 @@ def py_value(value):
     PyInt = _jclass("io.github.cdisvm.runtime.builtin.PyInt")
     PyStr = _jclass("io.github.cdisvm.runtime.builtin.PyStr")
     PyNone = _jclass("io.github.cdisvm.runtime.builtin.PyNone")
+    PyList = _jclass("io.github.cdisvm.runtime.builtin.PyList")
+    PyTuple = _jclass("io.github.cdisvm.runtime.builtin.PyTuple")
 
     if isinstance(value, PyBool):
         return value.value()
@@ -380,6 +401,10 @@ def py_value(value):
         return value.value().longValue()
     if isinstance(value, PyStr):
         return value.value()
+    if isinstance(value, PyList):
+        return [py_value(v) for v in value]
+    if isinstance(value, PyTuple):
+        return tuple(py_value(v) for v in value)
     if isinstance(value, PyNone):
         return None
 

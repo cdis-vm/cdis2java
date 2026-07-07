@@ -31,6 +31,10 @@ public class PySequenceBase<T extends PyObject> implements PyObject, PyGettable,
         this.delegate = delegate;
     }
 
+    public List<T> getDelegate() {
+        return delegate;
+    }
+
     @Override
     public PyAttributes pyAttributes() {
         return null;

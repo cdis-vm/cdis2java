@@ -27,6 +27,11 @@ public record FunctionSignature(List<FunctionParameter> parameters, PyType retur
         private List<FunctionParameter> parameters = new ArrayList<>();
         private PyType returnType;
 
+        public Builder param(FunctionParameter parameter) {
+            parameters.add(parameter);
+            return this;
+        }
+
         public Builder param(String name, Class<? extends PyObject> type) {
             parameters.add(new FunctionParameter(
                     parameters.size(),
@@ -46,6 +51,11 @@ public record FunctionSignature(List<FunctionParameter> parameters, PyType retur
                     PyType.of(type),
                     defaultValue
             ));
+            return this;
+        }
+
+        public Builder returningType(PyType returnType) {
+            this.returnType = returnType;
             return this;
         }
 

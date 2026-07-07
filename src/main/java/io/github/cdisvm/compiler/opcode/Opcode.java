@@ -39,6 +39,6 @@ public sealed interface Opcode
         SetItem, SetUpdate, StoreAttr, StoreCell, StoreGlobal, StoreLocal, StoreSynthetic, StoreTypeAttr, Swap, UnaryOp,
         UnpackElements, UnpackMapping, WithKeywordArg, WithPositionalArg, YieldValue {
     default void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
-        throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException(getClass().getSimpleName());
     }
 }

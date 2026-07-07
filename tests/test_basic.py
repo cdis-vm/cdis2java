@@ -6,3 +6,12 @@ def test_return_constant():
 
     match = create_function_match_asserter(constant)
     match()
+
+
+def test_return_tuple():
+    def constant(x):
+        return (x,)
+
+    match = create_function_match_asserter(constant)
+    match(1)
+    match(2)
