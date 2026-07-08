@@ -21,9 +21,14 @@ def test_return_closure():
     a = 10
 
     def closure():
-        return a
+        nonlocal a
+        old = a
+        a = 20
+        return old
 
     match = create_function_match_asserter(closure)
+    match()
+    assert a == 20
     match()
 
 def test_return_arg():
