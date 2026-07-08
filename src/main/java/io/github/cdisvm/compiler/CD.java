@@ -5,6 +5,7 @@ import java.util.List;
 
 import io.github.cdisvm.runtime.PyCallBuilder;
 import io.github.cdisvm.runtime.PyCallable;
+import io.github.cdisvm.runtime.PyCell;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.builtin.PyList;
 import io.github.cdisvm.runtime.builtin.PyTuple;
@@ -12,6 +13,7 @@ import io.github.cdisvm.runtime.builtin.PyTuple;
 public final class CD {
     public static final ClassDesc VOID = ClassDesc.ofDescriptor("V");
     public static final ClassDesc INT = ClassDesc.ofDescriptor("I");
+    public static final ClassDesc LONG = ClassDesc.ofDescriptor("J");
     public static final ClassDesc BOOLEAN = ClassDesc.ofDescriptor("Z");
     public static final ClassDesc OBJECT = CD.of(Object.class);
     public static final ClassDesc LIST = CD.of(List.class);
@@ -20,6 +22,7 @@ public final class CD {
     public static final ClassDesc PY_CALL_BUILDER = CD.of(PyCallBuilder.class);
     public static final ClassDesc PY_TUPLE = CD.of(PyTuple.class);
     public static final ClassDesc PY_LIST = CD.of(PyList.class);
+    public static final ClassDesc PY_CELL = CD.of(PyCell.class);
 
     private CD() {}
 
@@ -31,6 +34,8 @@ public final class CD {
                 return BOOLEAN;
             } else if (int.class.equals(clazz)) {
                 return INT;
+            } else if (long.class.equals(clazz)) {
+                return LONG;
             }
         }
         return ClassDesc.of(clazz.getCanonicalName());

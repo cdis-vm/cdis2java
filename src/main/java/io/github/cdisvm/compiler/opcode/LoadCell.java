@@ -1,5 +1,13 @@
 package io.github.cdisvm.compiler.opcode;
 
+import java.lang.classfile.CodeBuilder;
+
+import io.github.cdisvm.compiler.CD;
+import io.github.cdisvm.compiler.CompilationRun;
+import io.github.cdisvm.compiler.MD;
+import io.github.cdisvm.compiler.StackMetadata;
+import io.github.cdisvm.runtime.PyObject;
+
 /**
  * Loads a cell variable onto the stack.
  * <p>
@@ -22,9 +30,16 @@ package io.github.cdisvm.compiler.opcode;
  *
  * @param cellName the name of the cell variable
  */
-public record LoadCell(String cellName) implements Opcode, HasVariable {
+public record LoadCell(String cellName) implements Opcode, HasCell {
     @Override
     public String getVariableName() {
         return cellName;
+    }
+
+    @Override
+    public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
+        var slot = compilationRun.getVariableSlot(cellName);
+        codeBuilder.aload(slot);
+        codeBuilder.invokevirtual(CD.PY_CELL, "getValue", MD.of(PyObject.class));
     }
 }

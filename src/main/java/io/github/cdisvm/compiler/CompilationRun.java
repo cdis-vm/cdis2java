@@ -4,10 +4,14 @@ import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.Label;
 import java.lang.constant.ClassDesc;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.jspecify.annotations.NullMarked;
 
+import io.github.cdisvm.compiler.opcode.HasCell;
 import io.github.cdisvm.compiler.opcode.HasTarget;
 import io.github.cdisvm.compiler.opcode.HasVariable;
 
@@ -18,6 +22,7 @@ public record CompilationRun(CDisCompiler compiler,
                              Bytecode bytecode,
                              Map<Integer, Label> bytecodeIndexToLabel,
                              Map<String, Integer> variableNameToSlot,
+                             Set<String> cellVariableNameSet,
                              int syntheticStart) {
     public static CompilationRun init(
             CDisCompiler compiler,
@@ -27,6 +32,7 @@ public record CompilationRun(CDisCompiler compiler,
             int reservedSlots) {
         var variableNameToSlot  = new LinkedHashMap<String, Integer>();
         var bytecodeIndexToLabel = new LinkedHashMap<Integer, Label>();
+        var cellVariableNameSet = new LinkedHashSet<String>();
         var lastLine = -1;
 
         for (var parameter : bytecode.signature().parameters()) {
@@ -44,6 +50,9 @@ public record CompilationRun(CDisCompiler compiler,
             if (instruction.opcode() instanceof HasVariable hasVariable) {
                 variableNameToSlot.computeIfAbsent(hasVariable.getVariableName(), _ -> reservedSlots + variableNameToSlot.size());
             }
+            if (instruction.opcode() instanceof HasCell hasCell) {
+                cellVariableNameSet.add(hasCell.getVariableName());
+            }
         }
 
         for (var exceptionHandler : bytecode.exceptionHandlers()) {
@@ -52,7 +61,22 @@ public record CompilationRun(CDisCompiler compiler,
             bytecodeIndexToLabel.computeIfAbsent(exceptionHandler.handlerBytecodeIndex(), _ -> codeBuilder.newLabel());
         }
 
-        return new CompilationRun(compiler, callableClassDesc, codeBuilder, bytecode, bytecodeIndexToLabel, variableNameToSlot, reservedSlots + variableNameToSlot.size());
+        return new CompilationRun(compiler, callableClassDesc, codeBuilder, bytecode, bytecodeIndexToLabel, variableNameToSlot,
+                cellVariableNameSet, reservedSlots + variableNameToSlot.size());
+    }
+
+    public int[] getCellSlots() {
+        var out = new int[cellVariableNameSet.size()];
+        var index = 0;
+        for (var cellVariableName : cellVariableNameSet) {
+            out[index] = variableNameToSlot.get(cellVariableName);
+            index++;
+        }
+        return out;
+    }
+
+    public boolean isCell(String variableName) {
+        return cellVariableNameSet.contains(variableName);
     }
 
     public int getVariableSlot(String variableName) {

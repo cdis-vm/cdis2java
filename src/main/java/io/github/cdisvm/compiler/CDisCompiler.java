@@ -25,17 +25,21 @@ import org.jspecify.annotations.Nullable;
 
 import io.github.cdisvm.compiler.opcode.LoadConstant;
 import io.github.cdisvm.runtime.PyCallable;
+import io.github.cdisvm.runtime.PyCell;
 import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyObject;
 
 public class CDisCompiler {
 
     private final ClassFile classFile;
     private final CDisClassLoader classLoader;
-    private long classIdGenerator = 0;
+    private final Map<Long, String> cellIdToCellClass;
+    private long classIdGenerator;
 
     public CDisCompiler() {
         this.classLoader = new CDisClassLoader();
         this.classFile = ClassFile.of();
+        this.cellIdToCellClass = new LinkedHashMap<>();
         this.classIdGenerator = 0;
     }
 
@@ -53,10 +57,37 @@ public class CDisCompiler {
         return createCallable(bytecode, callBuilder);
     }
 
-    private String nextId() {
+    private String nextClassId() {
         var next = "$" + classIdGenerator;
         classIdGenerator++;
         return next;
+    }
+
+    public String createCellClass(long cellId, PyObject value) {
+        if (cellIdToCellClass.containsKey(cellId)) {
+            return cellIdToCellClass.get(cellId);
+        }
+        if (!(value instanceof PyConstant constant)) {
+            throw new IllegalArgumentException("Cannot convert initial value to a constant.");
+        }
+
+        var cellClass = PyCell.getClassName(cellId);
+        var cellClassDesc = ClassDesc.of(cellClass);
+        var bytecode = classFile.build(cellClassDesc, classBuilder -> {
+            classBuilder.withField(PyCell.CELL_FIELD_NAME, CD.PY_CELL, Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+
+            classBuilder.withMethodBody("<clinit>", MethodTypeDesc.of(CD.VOID), Modifier.PUBLIC | Modifier.STATIC, codeBuilder -> {
+                codeBuilder.new_(CD.PY_CELL);
+                codeBuilder.dup();
+                codeBuilder.loadConstant(cellId);
+                constant.loadValueOntoStack(codeBuilder);
+                codeBuilder.invokespecial(CD.PY_CELL, "<init>", MD.of(void.class, long.class, PyObject.class));
+                codeBuilder.putstatic(cellClassDesc, PyCell.CELL_FIELD_NAME, CD.PY_CELL);
+                codeBuilder.return_();
+            });
+        });
+        classLoader.registerClass(cellClass, bytecode);
+        return cellClass;
     }
 
     public static String arbitraryTextToJavaIdentifierName(String text) {
@@ -87,7 +118,7 @@ public class CDisCompiler {
     }
 
     ClassDesc createCallBuilder(String functionQualifiedName, FunctionSignature signature, Set<ClassDesc> additionalInterfaces) {
-        var callBuilderClassName = FunctionSignature.CALL_BUILDER_PACKAGE + nextId()  + "." + arbitraryTextToJavaIdentifierName(functionQualifiedName);
+        var callBuilderClassName = FunctionSignature.CALL_BUILDER_PACKAGE + nextClassId()  + "." + arbitraryTextToJavaIdentifierName(functionQualifiedName);
         var callBuilderClassDesc = ClassDesc.of(callBuilderClassName);
         var bytecode = classFile.build(callBuilderClassDesc, classBuilder -> {
             var constantPool = classBuilder.constantPool();
@@ -394,7 +425,7 @@ public class CDisCompiler {
     }
 
     private PyCallable createCallable(Bytecode bytecode, ClassDesc callBuilderClassDescriptor) {
-        var callableClass = FunctionSignature.CALLABLE_PACKAGE + nextId() + "." + bytecode.functionName();
+        var callableClass = FunctionSignature.CALLABLE_PACKAGE + nextClassId() + "." + bytecode.functionName();
         var callableClassDescriptor = ClassDesc.of(callableClass);
         var classBytecode = classFile.build(callableClassDescriptor, classBuilder -> {
             var constantPool = classBuilder.constantPool();
@@ -409,7 +440,7 @@ public class CDisCompiler {
 
             if (!constantMap.isEmpty()) {
                 for (var constantEntry : constantMap.entrySet()) {
-                    classBuilder.withField(constantEntry.getKey(), ClassDesc.of(constantEntry.getValue().getClass().getCanonicalName()), Modifier.PRIVATE | Modifier.FINAL | Modifier.STATIC);
+                    classBuilder.withField(constantEntry.getKey(), CD.of(constantEntry.getValue().getClass()), Modifier.PRIVATE | Modifier.FINAL | Modifier.STATIC);
                 }
 
                 classBuilder.withMethodBody("<clinit>", MethodTypeDesc.of(CD.VOID), Modifier.PUBLIC | Modifier.STATIC, codeBuilder -> {
@@ -442,13 +473,38 @@ public class CDisCompiler {
                 var compileRun = CompilationRun.init(this, callableClassDescriptor, codeBuilder, bytecode, 3);
 
                 var invalidArgumentsLabel = codeBuilder.newLabel();
+
+                for (var variableEntry : compileRun.variableNameToSlot().entrySet()) {
+                    if (compileRun.isCell(variableEntry.getKey())) {
+                        var slot = compileRun.getVariableSlot(variableEntry.getKey());
+                        if (!bytecode.closure().containsKey(variableEntry.getKey())) {
+                            codeBuilder.new_(CD.PY_CELL);
+                            codeBuilder.dup();
+                            codeBuilder.invokespecial(CD.PY_CELL, "<init>", MethodTypeDesc.of(CD.VOID));
+                            codeBuilder.astore(slot);
+                        } else {
+                            var cell = bytecode.closure().get(variableEntry.getKey());
+                            var cellClass = createCellClass(cell.getCellId(), cell.getValue());
+                            codeBuilder.getstatic(ClassDesc.of(cellClass), PyCell.CELL_FIELD_NAME, CD.PY_CELL);
+                            codeBuilder.astore(slot);
+                        }
+                    }
+                }
+
                 for (var parameter : bytecode.signature().parameters()) {
                     codeBuilder.aload(2);
                     codeBuilder.getfield(callBuilderClassDescriptor, parameter.parameterName(), CD.PY_OBJECT);
                     codeBuilder.dup();
                     codeBuilder.aconst_null();
                     codeBuilder.if_acmpeq(invalidArgumentsLabel);
-                    codeBuilder.astore(compileRun.getVariableSlot(parameter.parameterName()));
+                    var slot = compileRun.getVariableSlot(parameter.parameterName());
+                    if (compileRun.isCell(parameter.parameterName())) {
+                        codeBuilder.aload(slot);
+                        codeBuilder.swap();
+                        codeBuilder.invokevirtual(CD.PY_CELL, "setValue", MD.of(void.class, PyObject.class));
+                    } else {
+                        codeBuilder.astore(slot);
+                    }
                 }
                 var codeStartLabel = codeBuilder.newLabel();
                 codeBuilder.goto_(codeStartLabel);

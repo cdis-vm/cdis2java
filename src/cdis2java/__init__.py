@@ -19,6 +19,7 @@ def _jpackage(name):
     return jpype.JPackage(name)
 
 def _convert_py_constant(value):
+    from types import CellType
     if isinstance(value, bool):
         PyBool = _jclass("io.github.cdisvm.runtime.builtin.PyBool")
         return PyBool.of(value)
@@ -43,6 +44,9 @@ def _convert_py_constant(value):
         for item in value:
             out.add(_convert_py_constant(item))
         return out
+    if isinstance(value, CellType):
+        return _convert_py_constant(value.cell_contents)
+
     raise ValueError(f"Unsupported constant type: {type(value)}")
 
 
@@ -354,8 +358,13 @@ def _convert_bytecode(bc):
         annotate_function = _convert_bytecode(bc.annotate_function)
 
     closure = _jclass("java.util.HashMap")()
-    globals_map = _jclass("java.util.HashMap")()
+    JCell = _jclass("io.github.cdisvm.runtime.PyCell")
 
+    for key, value in bc.closure.items():
+        # value is a cell
+        closure.put(key, JCell(id(value), _convert_py_constant(value)))
+
+    globals_map = _jclass("java.util.HashMap")()
     free_names = _py_set_to_java(bc.free_names)
 
     return JBytecode(

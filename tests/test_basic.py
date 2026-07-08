@@ -449,6 +449,7 @@ def test_try_dynamic_except():
     match(ValueError, 1, 2)
 
 
+@pytest.mark.skipif(sys.version_info >= (3, 14), reason="Python 3.14 and above do not support return in finally")
 def test_try_finally_return():
     def try_():
         try:
