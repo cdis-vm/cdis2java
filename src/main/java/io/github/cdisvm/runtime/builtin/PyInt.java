@@ -25,6 +25,7 @@ import io.github.cdisvm.runtime.binary.PyBitXorAble;
 import io.github.cdisvm.runtime.binary.PyDividable;
 import io.github.cdisvm.runtime.binary.PyFloorDividable;
 import io.github.cdisvm.runtime.binary.PyLShiftable;
+import io.github.cdisvm.runtime.binary.PyModuloAble;
 import io.github.cdisvm.runtime.binary.PyMultipliable;
 import io.github.cdisvm.runtime.binary.PyPowAble;
 import io.github.cdisvm.runtime.binary.PyRShiftable;
@@ -39,7 +40,7 @@ import io.github.cdisvm.runtime.comparison.PyHasNotEquals;
 @NullMarked
 public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements PyObject,
         PyIndexable, PyConstant, PyAddable, PySubtractable, PyMultipliable, PyDividable,
-        PyFloorDividable, PyLShiftable, PyRShiftable, PyPowAble, PyBitOrAble,
+        PyModuloAble, PyFloorDividable, PyLShiftable, PyRShiftable, PyPowAble, PyBitOrAble,
         PyBitAndAble, PyBitXorAble, PyHasPos, PyNegatable, PyInvertible,
         PyHasEquals, PyHasNotEquals, PyHasLessThan, PyHasLessThanOrEqual, PyHasGreaterThan,
         PyHasGreaterThanOrEqual {
@@ -225,6 +226,25 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
                 var leftBig = bigIntegerValue();
                 var rightBig = otherInt.bigIntegerValue();
                 return new PyInt(0L, leftBig.divide(rightBig));
+            }
+        }
+        return PyNotImplemented.INSTANCE;
+    }
+
+    @Override
+    public PyObject pyModulo(PyObject other) {
+        if (other instanceof PyInt otherInt) {
+            if (bigValue == null && otherInt.bigValue == null) {
+                return PyInt.of(Math.floorMod(smallValue, otherInt.smallValue));
+            } else {
+                var leftBig = bigIntegerValue();
+                var rightBig = otherInt.bigIntegerValue();
+                var signum = rightBig.signum();
+                if (signum == 0) {
+                    throw new ArithmeticException("division by zero");
+                }
+                // TODO: is the math collect for when RHS negative?
+                return new PyInt(0L, signum == 1? leftBig.mod(rightBig) : leftBig.mod(rightBig.negate()).negate());
             }
         }
         return PyNotImplemented.INSTANCE;
