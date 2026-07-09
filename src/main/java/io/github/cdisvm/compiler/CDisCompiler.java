@@ -91,6 +91,9 @@ public class CDisCompiler {
     }
 
     public static String arbitraryTextToJavaIdentifierName(String text) {
+        if (text.isEmpty()) {
+            return "$EMPTY$";
+        }
         var out = new StringBuilder();
         if (Character.isJavaIdentifierStart(text.charAt(0))) {
             var ch = text.charAt(0);
