@@ -12,7 +12,10 @@ import io.github.cdisvm.compiler.CD;
 import io.github.cdisvm.compiler.MD;
 import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyHasPos;
 import io.github.cdisvm.runtime.PyIndexable;
+import io.github.cdisvm.runtime.PyInvertible;
+import io.github.cdisvm.runtime.PyNegatable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.binary.PyAddable;
@@ -26,12 +29,20 @@ import io.github.cdisvm.runtime.binary.PyMultipliable;
 import io.github.cdisvm.runtime.binary.PyPowAble;
 import io.github.cdisvm.runtime.binary.PyRShiftable;
 import io.github.cdisvm.runtime.binary.PySubtractable;
+import io.github.cdisvm.runtime.comparison.PyHasEquals;
+import io.github.cdisvm.runtime.comparison.PyHasGreaterThan;
+import io.github.cdisvm.runtime.comparison.PyHasGreaterThanOrEqual;
+import io.github.cdisvm.runtime.comparison.PyHasLessThan;
+import io.github.cdisvm.runtime.comparison.PyHasLessThanOrEqual;
+import io.github.cdisvm.runtime.comparison.PyHasNotEquals;
 
 @NullMarked
 public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements PyObject,
         PyIndexable, PyConstant, PyAddable, PySubtractable, PyMultipliable, PyDividable,
         PyFloorDividable, PyLShiftable, PyRShiftable, PyPowAble, PyBitOrAble,
-        PyBitAndAble, PyBitXorAble {
+        PyBitAndAble, PyBitXorAble, PyHasPos, PyNegatable, PyInvertible,
+        PyHasEquals, PyHasNotEquals, PyHasLessThan, PyHasLessThanOrEqual, PyHasGreaterThan,
+        PyHasGreaterThanOrEqual {
     private static final int CACHE_START = -10;
     private static final int CACHE_END = 256;
     private static final PyInt[] CACHE = generateCache();
@@ -309,5 +320,93 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
             return new PyInt(0L, leftBig.subtract(rightBig));
         }
         return PyNotImplemented.INSTANCE;
+    }
+
+    @Override
+    public PyInt pyPositive() {
+        return this;
+    }
+
+    @Override
+    public PyInt pyInvert() {
+        return (PyInt) pyNegate().pySubtract(PyInt.of(1L));
+    }
+
+    @Override
+    public PyInt pyNegate() {
+        if (bigValue == null) {
+            try {
+                return PyInt.of(Math.multiplyExact(smallValue, -1L));
+            } catch (ArithmeticException e) {
+                return new PyInt(0L, BigInteger.valueOf(smallValue).negate());
+            }
+        }
+        return new PyInt(0L, bigValue.negate());
+    }
+
+    @Override
+    public PyObject pyEquals(PyObject other) {
+        if (!(other instanceof PyInt otherInt)) {
+            return PyNotImplemented.INSTANCE;
+        }
+        if (bigValue == null && otherInt.bigValue == null) {
+            return PyBool.of(smallValue == otherInt.smallValue);
+        }
+        return PyBool.of(bigIntegerValue().equals(otherInt.bigIntegerValue()));
+    }
+
+    @Override
+    public PyObject pyGreaterThan(PyObject other) {
+        if (!(other instanceof PyInt otherInt)) {
+            return PyNotImplemented.INSTANCE;
+        }
+        if (bigValue == null && otherInt.bigValue == null) {
+            return PyBool.of(smallValue > otherInt.smallValue);
+        }
+        return PyBool.of(bigIntegerValue().compareTo(otherInt.bigIntegerValue()) > 0);
+    }
+
+    @Override
+    public PyObject pyGreaterThanOrEqual(PyObject other) {
+        if (!(other instanceof PyInt otherInt)) {
+            return PyNotImplemented.INSTANCE;
+        }
+        if (bigValue == null && otherInt.bigValue == null) {
+            return PyBool.of(smallValue >= otherInt.smallValue);
+        }
+        return PyBool.of(bigIntegerValue().compareTo(otherInt.bigIntegerValue()) >= 0);
+    }
+
+    @Override
+    public PyObject pyLessThan(PyObject other) {
+        if (!(other instanceof PyInt otherInt)) {
+            return PyNotImplemented.INSTANCE;
+        }
+        if (bigValue == null && otherInt.bigValue == null) {
+            return PyBool.of(smallValue < otherInt.smallValue);
+        }
+        return PyBool.of(bigIntegerValue().compareTo(otherInt.bigIntegerValue()) < 0);
+    }
+
+    @Override
+    public PyObject pyLessThanOrEqual(PyObject other) {
+        if (!(other instanceof PyInt otherInt)) {
+            return PyNotImplemented.INSTANCE;
+        }
+        if (bigValue == null && otherInt.bigValue == null) {
+            return PyBool.of(smallValue <= otherInt.smallValue);
+        }
+        return PyBool.of(bigIntegerValue().compareTo(otherInt.bigIntegerValue()) <= 0);
+    }
+
+    @Override
+    public PyObject pyNotEquals(PyObject other) {
+        if (!(other instanceof PyInt otherInt)) {
+            return PyNotImplemented.INSTANCE;
+        }
+        if (bigValue == null && otherInt.bigValue == null) {
+            return PyBool.of(smallValue != otherInt.smallValue);
+        }
+        return PyBool.of(!bigIntegerValue().equals(otherInt.bigIntegerValue()));
     }
 }
