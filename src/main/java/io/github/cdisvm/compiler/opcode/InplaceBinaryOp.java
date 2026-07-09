@@ -1,6 +1,10 @@
 package io.github.cdisvm.compiler.opcode;
 
+import java.lang.classfile.CodeBuilder;
+
+import io.github.cdisvm.compiler.CompilationRun;
 import io.github.cdisvm.compiler.InplaceBinaryOperator;
+import io.github.cdisvm.compiler.StackMetadata;
 
 /**
  * Performs an inplace binary operation on the two items on the top of the stack.
@@ -21,4 +25,8 @@ import io.github.cdisvm.compiler.InplaceBinaryOperator;
  * @param operator the inplace binary operator to apply
  */
 public record InplaceBinaryOp(InplaceBinaryOperator operator) implements Opcode {
+    @Override
+    public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
+        operator.implement(codeBuilder);
+    }
 }
