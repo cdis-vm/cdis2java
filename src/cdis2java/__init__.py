@@ -407,7 +407,7 @@ def py_value(value):
     if isinstance(value, PyBool):
         return value.value()
     if isinstance(value, PyInt):
-        return value.value().longValue()
+        return int(str(value.hexString()), 16)
     if isinstance(value, PyStr):
         return value.value()
     if isinstance(value, PyList):

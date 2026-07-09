@@ -31,7 +31,7 @@ public record GetItem() implements Opcode {
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
         // TODO: check from the bytecode if we know it a PyGettable
         codeBuilder.swap();
-        codeBuilder.invokestatic(CD.of(PyGettable.class), "wrapping", MD.of(PyGettable.class, PyObject.class));
+        codeBuilder.invokestatic(CD.of(PyGettable.class), "wrapping", MD.of(PyGettable.class, PyObject.class), true);
         codeBuilder.swap();
         codeBuilder.invokeinterface(CD.of(PyGettable.class), "pyGetItem", MD.of(PyObject.class, PyObject.class));
     }

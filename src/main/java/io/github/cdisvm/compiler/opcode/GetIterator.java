@@ -29,7 +29,7 @@ public record GetIterator() implements Opcode {
     @Override
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
         // TODO: Optimize if we know the type from stack metadata
-        codeBuilder.invokestatic(CD.PY_ITERABLE, "wrapping", MD.of(PyIterable.class, PyObject.class));
+        codeBuilder.invokestatic(CD.PY_ITERABLE, "wrapping", MD.of(PyIterable.class, PyObject.class), true);
         codeBuilder.invokeinterface(CD.PY_ITERABLE, "pyIterator", MD.of(PyIterator.class));
     }
 }

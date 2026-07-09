@@ -32,7 +32,7 @@ public record SetItem() implements Opcode {
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
         codeBuilder.swap();
         // TODO: check from stackMetadata if we know it is a PySettable object
-        codeBuilder.invokestatic(CD.of(PySettable.class), "wrapping", MD.of(PySettable.class, PyObject.class));
+        codeBuilder.invokestatic(CD.of(PySettable.class), "wrapping", MD.of(PySettable.class, PyObject.class), true);
         codeBuilder.dup_x2();
         codeBuilder.pop();
         codeBuilder.swap();

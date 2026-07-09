@@ -171,7 +171,7 @@ public class PySequenceBase<T extends PyObject> implements PyObject, PyGettable,
 
     @Override
     public PyObject pyGetItem(PyObject item) {
-        return delegate.get(PyIndexable.wrapping(item).pyIndex().value().intValueExact());
+        return delegate.get(PyIndexable.wrapping(item).pyIndex().intValue());
     }
 
     @Override

@@ -9,10 +9,21 @@ def create_function_match_asserter(function):
     def asserting_output_function(*args, **kwargs):
         nonlocal adapted, function
         call_builder = adapted.pyCallBuilder()
+        converted_to_value = dict()
         for arg in args:
-            getattr(call_builder, '$appendArgument')(java_value(arg))
+            if id(arg) in converted_to_value:
+                getattr(call_builder, '$appendArgument')(converted_to_value[id(arg)])
+            else:
+                converted = java_value(arg)
+                converted_to_value[id(arg)] = converted
+                getattr(call_builder, '$appendArgument')(converted)
         for key, value in kwargs.items():
-            getattr(call_builder, '$putArgument')(key, java_value(value))
+            if id(value) in converted_to_value:
+                getattr(call_builder, '$putArgument')(key, converted_to_value[value])
+            else:
+                converted = java_value(value)
+                converted_to_value[id(value)] = converted
+                getattr(call_builder, '$putArgument')(key, converted)
         try:
             out = py_value(adapted.pyCall(call_builder))
         except Exception as java_exception:

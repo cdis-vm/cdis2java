@@ -27,22 +27,36 @@ import io.github.cdisvm.runtime.PyObject;
 public record ListExtend() implements Opcode {
     @Override
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
-        codeBuilder.swap();
-        codeBuilder.dup_x1();
-        codeBuilder.swap();
+        // list, iterable
         // TODO: optimize this based on type knowledge from stackMetadata
         new GetIterator().implement(codeBuilder, compilationRun, stackMetadata);
         var startLabel = codeBuilder.newBoundLabel();
         var endLabel = codeBuilder.newLabel();
+
+        // list, iterator
         codeBuilder.dup();
         codeBuilder.invokeinterface(CD.PY_ITERATOR, "pyNext", MD.of(PyObject.class));
+        // list, iterator, next
         codeBuilder.dup();
         codeBuilder.aconst_null();
         codeBuilder.if_acmpeq(endLabel);
+        // list, iterator, next
+        codeBuilder.swap();
+        codeBuilder.dup_x2();
+        codeBuilder.pop();
+        // iterator, list, next
+        codeBuilder.swap();
+        codeBuilder.dup_x2();
+        codeBuilder.swap();
+        // list, iterator, list, next
         codeBuilder.invokevirtual(CD.PY_LIST,
              "add", MD.of(boolean.class, Object.class));
         codeBuilder.pop();
+        // list, iterator
         codeBuilder.goto_(startLabel);
         codeBuilder.labelBinding(endLabel);
+        // list, iterator, next
+        codeBuilder.pop2();
+        // list
     }
 }
