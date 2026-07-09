@@ -14,10 +14,11 @@ public interface PyContainer {
                 .pyAttributes()
                 .getAttributeByName("__contains__");
             if (containsCallable instanceof PyCallable callable) {
-                return (PyBool) callable.pyCallBuilder()
+                return callable.pyCallBuilder()
                         .$appendArgument(maybeContainer)
                         .$appendArgument(item)
-                        .pyCall();
+                        .pyCall()
+                        .pyTruth();
             } else {
                 throw new UnsupportedOperationException();
             }

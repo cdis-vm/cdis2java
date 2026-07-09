@@ -8,9 +8,11 @@ import io.github.cdisvm.compiler.CD;
 import io.github.cdisvm.compiler.CDisCompiler;
 import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyContainer;
+import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 
-public record PyStr(String value) implements PyConstant {
+public record PyStr(String value) implements PyConstant, PyContainer {
     @Override
     public void loadValueOntoStack(CodeBuilder codeBuilder) {
         codeBuilder.new_(ClassDesc.of(PyStr.class.getCanonicalName()));
@@ -38,5 +40,14 @@ public record PyStr(String value) implements PyConstant {
     @Override
     public PyBool pyTruth() {
         return PyBool.of(value.isEmpty());
+    }
+
+    @Override
+    public PyBool pyHasItem(PyObject item) {
+        if (!(item instanceof PyStr otherStr)) {
+            // TODO: Throw TypeError instead
+            throw new UnsupportedOperationException();
+        }
+        return PyBool.of(value.contains(otherStr.value));
     }
 }
