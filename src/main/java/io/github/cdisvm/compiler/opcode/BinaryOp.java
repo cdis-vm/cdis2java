@@ -1,6 +1,10 @@
 package io.github.cdisvm.compiler.opcode;
 
+import java.lang.classfile.CodeBuilder;
+
 import io.github.cdisvm.compiler.BinaryOperator;
+import io.github.cdisvm.compiler.CompilationRun;
+import io.github.cdisvm.compiler.StackMetadata;
 
 /**
  * Performs a binary operation on the two items on the top of the stack.
@@ -29,4 +33,8 @@ import io.github.cdisvm.compiler.BinaryOperator;
  * @param operator the binary or comparison operator to apply
  */
 public record BinaryOp(BinaryOperator operator) implements Opcode {
+    @Override
+    public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
+        operator.implement(codeBuilder);
+    }
 }
