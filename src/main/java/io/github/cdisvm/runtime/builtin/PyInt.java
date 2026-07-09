@@ -15,9 +15,23 @@ import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyIndexable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
+import io.github.cdisvm.runtime.binary.PyAddable;
+import io.github.cdisvm.runtime.binary.PyBitAndAble;
+import io.github.cdisvm.runtime.binary.PyBitOrAble;
+import io.github.cdisvm.runtime.binary.PyBitXorAble;
+import io.github.cdisvm.runtime.binary.PyDividable;
+import io.github.cdisvm.runtime.binary.PyFloorDividable;
+import io.github.cdisvm.runtime.binary.PyLShiftable;
+import io.github.cdisvm.runtime.binary.PyMultipliable;
+import io.github.cdisvm.runtime.binary.PyPowAble;
+import io.github.cdisvm.runtime.binary.PyRShiftable;
+import io.github.cdisvm.runtime.binary.PySubtractable;
 
 @NullMarked
-public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements PyObject, PyIndexable, PyConstant {
+public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements PyObject,
+        PyIndexable, PyConstant, PyAddable, PySubtractable, PyMultipliable, PyDividable,
+        PyFloorDividable, PyLShiftable, PyRShiftable, PyPowAble, PyBitOrAble,
+        PyBitAndAble, PyBitXorAble {
     private static final int CACHE_START = -10;
     private static final int CACHE_END = 256;
     private static final PyInt[] CACHE = generateCache();
@@ -42,6 +56,14 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
             return Math.toIntExact(smallValue);
         } else {
             return bigValue.intValueExact();
+        }
+    }
+
+    public BigInteger bigIntegerValue() {
+        if (bigValue == null) {
+            return BigInteger.valueOf(smallValue);
+        } else {
+            return bigValue;
         }
     }
 
@@ -104,5 +126,72 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
         } else {
             return PyBool.of(bigValue.compareTo(BigInteger.ZERO) != 0);
         }
+    }
+
+    @Override
+    public PyObject pyAdd(PyObject other) {
+        if (other instanceof PyInt otherInt) {
+            if (bigValue == null && otherInt.bigValue == null) {
+                try {
+                    return PyInt.of(Math.addExact(smallValue, otherInt.smallValue));
+                } catch (ArithmeticException e) {
+                    // Done outside the if
+                }
+            }
+            var leftBig = bigIntegerValue();
+            var rightBig = bigIntegerValue();
+            return new PyInt(0L, leftBig.add(rightBig));
+        }
+        return PyNotImplemented.INSTANCE;
+    }
+
+    @Override
+    public PyObject pyBitAnd(PyObject other) {
+        return null;
+    }
+
+    @Override
+    public PyObject pyBitOr(PyObject other) {
+        return null;
+    }
+
+    @Override
+    public PyObject pyBitXor(PyObject other) {
+        return null;
+    }
+
+    @Override
+    public PyObject pyDivide(PyObject other) {
+        return null;
+    }
+
+    @Override
+    public PyObject pyFloorDiv(PyObject other) {
+        return null;
+    }
+
+    @Override
+    public PyObject pyLShift(PyObject other) {
+        return null;
+    }
+
+    @Override
+    public PyObject pyMultiply(PyObject other) {
+        return null;
+    }
+
+    @Override
+    public PyObject pyPow(PyObject other) {
+        return null;
+    }
+
+    @Override
+    public PyObject pyRShift(PyObject other) {
+        return null;
+    }
+
+    @Override
+    public PyObject pySubtract(PyObject other) {
+        return null;
     }
 }
