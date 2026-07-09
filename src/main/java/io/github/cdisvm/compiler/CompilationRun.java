@@ -23,7 +23,8 @@ public record CompilationRun(CDisCompiler compiler,
                              Map<Integer, Label> bytecodeIndexToLabel,
                              Map<String, Integer> variableNameToSlot,
                              Set<String> cellVariableNameSet,
-                             int syntheticStart) {
+                             int syntheticStart,
+                             int syntheticCount) {
     public static CompilationRun init(
             CDisCompiler compiler,
             ClassDesc callableClassDesc,
@@ -62,7 +63,8 @@ public record CompilationRun(CDisCompiler compiler,
         }
 
         return new CompilationRun(compiler, callableClassDesc, codeBuilder, bytecode, bytecodeIndexToLabel, variableNameToSlot,
-                cellVariableNameSet, reservedSlots + variableNameToSlot.size());
+                cellVariableNameSet, reservedSlots + variableNameToSlot.size(),
+                bytecode.syntheticCount());
     }
 
     public int[] getCellSlots() {
@@ -85,5 +87,9 @@ public record CompilationRun(CDisCompiler compiler,
 
     public int getSyntheticSlot(int syntheticIndex) {
         return syntheticStart + syntheticIndex;
+    }
+
+    public int getWorkSlot(int workSlot) {
+        return syntheticStart + syntheticCount + workSlot;
     }
 }
