@@ -5,6 +5,7 @@ import java.lang.constant.ClassDesc;
 
 import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 
 public record PyBool(boolean value) implements PyConstant {
@@ -47,5 +48,9 @@ public record PyBool(boolean value) implements PyConstant {
     @Override
     public PyBool pyTruth() {
         return this;
+    }
+
+    public PyBool negate() {
+        return value? FALSE : TRUE;
     }
 }

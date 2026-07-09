@@ -29,6 +29,12 @@ import io.github.cdisvm.runtime.binary.right.PyRightMultipliable;
 import io.github.cdisvm.runtime.binary.right.PyRightPowAble;
 import io.github.cdisvm.runtime.binary.right.PyRightRShiftable;
 import io.github.cdisvm.runtime.binary.right.PyRightSubtractable;
+import io.github.cdisvm.runtime.comparison.PyHasEquals;
+import io.github.cdisvm.runtime.comparison.PyHasGreaterThan;
+import io.github.cdisvm.runtime.comparison.PyHasGreaterThanOrEqual;
+import io.github.cdisvm.runtime.comparison.PyHasLessThan;
+import io.github.cdisvm.runtime.comparison.PyHasLessThanOrEqual;
+import io.github.cdisvm.runtime.comparison.PyHasNotEquals;
 
 public enum BinaryOperator {
     Add("Add", PyAddable.class, "pyAdd", PyRightAddable.class, "pyRightAdd", "add"),
@@ -44,12 +50,14 @@ public enum BinaryOperator {
     BitXor("BitXor", PyBitXorAble.class, "pyBitXor", PyRightBitXorAble.class, "pyRightBitXor", "bitXor"),
     BitAnd("BitAnd", PyBitAndAble.class, "pyBitAnd", PyRightBitAndAble.class, "pyRightBitAnd", "bitAnd"),
     MatMult("MatMult",  PyMatMultipliable.class, "pyMatMult", PyRightMatMultipliable.class, "pyRightMatMult", "matrixMultiply"),
-    Eq("Eq", null, "pyEq", null, "pyEq", "equal"),
-    NotEq("NotEq", null, "pyNotEq", null, "pyNotEq", "notEqual"),
-    Lt("Lt", null, "pyLt", null, "pyGt", "lessThan"),
-    LtE("LtE",null, "pyLtE", null, "pyGtE", "lessThanOrEqual"),
-    Gt("Gt", null, "pyGt", null, "pyLt", "greaterThan"),
-    GtE("GtE", null, "pyGtE", null, "pyLtE", "greaterThanOrEqual");
+
+    // Comparisons
+    Eq("Eq", PyHasEquals.class, "pyEquals", PyHasEquals.class, "pyEquals", "equal"),
+    NotEq("NotEq", PyHasNotEquals.class, "pyNotEquals", PyHasNotEquals.class, "pyNotEquals", "notEqual"),
+    Lt("Lt", PyHasLessThan.class, "pyLessThan", PyHasGreaterThan.class, "pyGreaterThan", "lessThan"),
+    LtE("LtE", PyHasLessThanOrEqual.class, "pyLessThanOrEqual", PyHasGreaterThanOrEqual.class, "pyGreaterThanOrEqual", "lessThanOrEqual"),
+    Gt("Gt", PyHasGreaterThan.class, "pyGreaterThan", PyHasLessThan.class, "pyLessThan", "greaterThan"),
+    GtE("GtE", PyHasGreaterThanOrEqual.class, "pyGreaterThanOrEqual", PyHasLessThanOrEqual.class, "pyLessThanOrEqual", "greaterThanOrEqual");
 
     private final String id;
     private final Class<?> leftInterface;
