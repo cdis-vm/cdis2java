@@ -77,7 +77,8 @@ public enum BinaryOperator {
     }
 
     public void implement(CodeBuilder codeBuilder) {
-        codeBuilder.invokestatic(CD.of(leftInterface), staticMethod, MD.of(PyObject.class, PyObject.class, PyObject.class));
+        codeBuilder.invokestatic(CD.of(leftInterface), staticMethod,
+                MD.of(PyObject.class, PyObject.class, PyObject.class), true);
     }
 
     public Class<?> getLeftInterface() {
