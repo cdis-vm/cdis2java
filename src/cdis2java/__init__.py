@@ -403,6 +403,8 @@ def py_value(value):
     PyNone = _jclass("io.github.cdisvm.runtime.builtin.PyNone")
     PyList = _jclass("io.github.cdisvm.runtime.builtin.PyList")
     PyTuple = _jclass("io.github.cdisvm.runtime.builtin.PyTuple")
+    PyDict = _jclass("io.github.cdisvm.runtime.builtin.PyDict")
+    PySet = _jclass("io.github.cdisvm.runtime.builtin.PySet")
 
     if isinstance(value, PyBool):
         return value.value()
@@ -414,6 +416,10 @@ def py_value(value):
         return [py_value(v) for v in value]
     if isinstance(value, PyTuple):
         return tuple(py_value(v) for v in value)
+    if isinstance(value, PyDict):
+        return {py_value(entry.getKey()): py_value(entry.getValue()) for entry in value.entrySet()}
+    if isinstance(value, PySet):
+        return {py_value(v) for v in value}
     if isinstance(value, PyNone):
         return None
 

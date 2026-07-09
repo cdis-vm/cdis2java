@@ -11,7 +11,9 @@ import io.github.cdisvm.runtime.PyIterable;
 import io.github.cdisvm.runtime.PyIterator;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.builtin.PyBool;
+import io.github.cdisvm.runtime.builtin.PyDict;
 import io.github.cdisvm.runtime.builtin.PyList;
+import io.github.cdisvm.runtime.builtin.PySet;
 import io.github.cdisvm.runtime.builtin.PyTuple;
 
 public final class CD {
@@ -26,6 +28,8 @@ public final class CD {
     public static final ClassDesc PY_CALL_BUILDER = CD.of(PyCallBuilder.class);
     public static final ClassDesc PY_TUPLE = CD.of(PyTuple.class);
     public static final ClassDesc PY_LIST = CD.of(PyList.class);
+    public static final ClassDesc PY_DICT= CD.of(PyDict.class);
+    public static final ClassDesc PY_SET = CD.of(PySet.class);
     public static final ClassDesc PY_CELL = CD.of(PyCell.class);
     public static final ClassDesc PY_BOOL = CD.of(PyBool.class);
     public static final ClassDesc PY_ITERABLE = CD.of(PyIterable.class);
