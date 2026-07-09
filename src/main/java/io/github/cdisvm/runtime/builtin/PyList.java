@@ -19,6 +19,14 @@ public class PyList<T extends PyObject> extends PySequenceBase<T> implements PyS
     @Override
     @SuppressWarnings("unchecked")
     public void pySetItem(PyObject key, PyObject value) {
-        delegate.set(PyIndexable.wrapping(key).pyIndex().intValue(), (T) value);
+        var index = PyIndexable.wrapping(key).pyIndex().intValue();
+        if (index < 0) {
+            index = delegate.size() + index;
+        }
+        if (index < 0 || index >= delegate.size()) {
+            // TODO: Throw IndexError instead
+            throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + delegate.size());
+        }
+        delegate.set(index, (T) value);
     }
 }

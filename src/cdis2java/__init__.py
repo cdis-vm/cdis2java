@@ -44,6 +44,18 @@ def _convert_py_constant(value):
         for item in value:
             out.add(_convert_py_constant(item))
         return out
+    if isinstance(value, dict):
+        PyDict = _jclass("io.github.cdisvm.runtime.builtin.PyDict")
+        out = PyDict()
+        for key, item in value.items():
+            out.put(_convert_py_constant(key), _convert_py_constant(item))
+        return out
+    if isinstance(value, set):
+        PySet = _jclass("io.github.cdisvm.runtime.builtin.PySet")
+        out = PySet()
+        for item in value:
+            out.add(_convert_py_constant(item))
+        return out
     if isinstance(value, CellType):
         return _convert_py_constant(value.cell_contents)
 
