@@ -1,5 +1,11 @@
 package io.github.cdisvm.compiler.opcode;
 
+import java.lang.classfile.CodeBuilder;
+import java.lang.classfile.TypeKind;
+
+import io.github.cdisvm.compiler.CompilationRun;
+import io.github.cdisvm.compiler.StackMetadata;
+
 /**
  * Returns the value on top of stack and "pauses" execution.
  * <p>
@@ -21,4 +27,8 @@ package io.github.cdisvm.compiler.opcode;
  * }</pre>
  */
 public record YieldValue() implements Opcode {
+    @Override
+    public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
+        codeBuilder.return_(TypeKind.REFERENCE);
+    }
 }

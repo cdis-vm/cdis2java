@@ -41,5 +41,6 @@ public record LoadCell(String cellName) implements Opcode, HasCell {
         var slot = compilationRun.getVariableSlot(cellName);
         codeBuilder.aload(slot);
         codeBuilder.invokevirtual(CD.PY_CELL, "getValue", MD.of(PyObject.class));
+        // TODO: check if variable exists
     }
 }

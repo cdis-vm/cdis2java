@@ -1,5 +1,10 @@
 package io.github.cdisvm.compiler.opcode;
 
+import java.lang.classfile.CodeBuilder;
+
+import io.github.cdisvm.compiler.CompilationRun;
+import io.github.cdisvm.compiler.StackMetadata;
+
 /**
  * Deletes a local variable.
  * <p>
@@ -23,5 +28,13 @@ public record DeleteLocal(String localName) implements Opcode, HasVariable {
     @Override
     public String getVariableName() {
         return localName;
+    }
+
+    @Override
+    public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
+        var slot = compilationRun.getVariableSlot(localName);
+        // TODO: check if variable exists
+        codeBuilder.aconst_null();
+        codeBuilder.astore(slot);
     }
 }

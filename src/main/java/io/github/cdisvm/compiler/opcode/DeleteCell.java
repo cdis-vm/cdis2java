@@ -40,6 +40,7 @@ public record DeleteCell(String cellName) implements Opcode, HasCell {
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
         var slot = compilationRun.getVariableSlot(cellName);
         codeBuilder.aload(slot);
+        // TODO: check if variable exists
         codeBuilder.aconst_null();
         codeBuilder.invokevirtual(CD.PY_CELL, "setValue", MD.of(void.class, PyObject.class));
     }

@@ -11,16 +11,19 @@ import org.jspecify.annotations.NullMarked;
 
 import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyContainer;
+import io.github.cdisvm.runtime.PyDelegatingIterator;
 import io.github.cdisvm.runtime.PyGettable;
 import io.github.cdisvm.runtime.PyIndexable;
+import io.github.cdisvm.runtime.PyIterable;
+import io.github.cdisvm.runtime.PyIterator;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySettable;
 import io.github.cdisvm.runtime.PySizable;
 import io.github.cdisvm.runtime.PyType;
 
 @NullMarked
-public class PySequenceBase<T extends PyObject> implements PyObject, PyGettable, PyContainer, PySizable,
-        List<T> {
+public class PySequenceBase<T extends PyObject> implements PyObject, PyGettable, PyContainer,
+        PySizable, PyIterable, List<T> {
     final List<T> delegate;
 
     public PySequenceBase() {
@@ -179,5 +182,10 @@ public class PySequenceBase<T extends PyObject> implements PyObject, PyGettable,
     @Override
     public PyBool pyTruth() {
         return PyBool.of(delegate.isEmpty());
+    }
+
+    @Override
+    public PyIterator pyIterator() {
+        return new PyDelegatingIterator(delegate.iterator());
     }
 }

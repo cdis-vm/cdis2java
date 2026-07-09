@@ -1,5 +1,10 @@
 package io.github.cdisvm.compiler.opcode;
 
+import java.lang.classfile.CodeBuilder;
+
+import io.github.cdisvm.compiler.CompilationRun;
+import io.github.cdisvm.compiler.StackMetadata;
+
 /**
  * Jumps to target unconditionally.
  * <p>
@@ -24,5 +29,10 @@ public record JumpTo(int targetBytecodeIndex) implements Opcode, HasTarget {
     @Override
     public int getTargetBytecodeIndex() {
         return targetBytecodeIndex;
+    }
+
+    @Override
+    public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
+        codeBuilder.goto_(compilationRun.bytecodeIndexToLabel().get(targetBytecodeIndex));
     }
 }

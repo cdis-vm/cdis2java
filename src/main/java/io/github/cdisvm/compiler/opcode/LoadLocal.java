@@ -34,5 +34,6 @@ public record LoadLocal(String localName) implements Opcode, HasVariable {
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
         var slot = compilationRun.getVariableSlot(localName);
         codeBuilder.aload(slot);
+        // TODO: check if variable exists
     }
 }
