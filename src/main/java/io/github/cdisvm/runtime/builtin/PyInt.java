@@ -139,7 +139,7 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
                 }
             }
             var leftBig = bigIntegerValue();
-            var rightBig = bigIntegerValue();
+            var rightBig = otherInt.bigIntegerValue();
             return new PyInt(0L, leftBig.add(rightBig));
         }
         return PyNotImplemented.INSTANCE;
@@ -147,51 +147,167 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
 
     @Override
     public PyObject pyBitAnd(PyObject other) {
-        return null;
+        if (other instanceof PyInt otherInt) {
+            if (bigValue == null && otherInt.bigValue == null) {
+                return PyInt.of(smallValue & otherInt.smallValue);
+            }
+            var leftBig = bigIntegerValue();
+            var rightBig = otherInt.bigIntegerValue();
+            return new PyInt(0L, leftBig.and(rightBig));
+        }
+        return PyNotImplemented.INSTANCE;
     }
 
     @Override
     public PyObject pyBitOr(PyObject other) {
-        return null;
+        if (other instanceof PyInt otherInt) {
+            if (bigValue == null && otherInt.bigValue == null) {
+                return PyInt.of(smallValue | otherInt.smallValue);
+            }
+            var leftBig = bigIntegerValue();
+            var rightBig = otherInt.bigIntegerValue();
+            return new PyInt(0L, leftBig.or(rightBig));
+        }
+        return PyNotImplemented.INSTANCE;
     }
 
     @Override
     public PyObject pyBitXor(PyObject other) {
-        return null;
+        if (other instanceof PyInt otherInt) {
+            if (bigValue == null && otherInt.bigValue == null) {
+                return PyInt.of(smallValue ^ otherInt.smallValue);
+            }
+            var leftBig = bigIntegerValue();
+            var rightBig = otherInt.bigIntegerValue();
+            return new PyInt(0L, leftBig.xor(rightBig));
+        }
+        return PyNotImplemented.INSTANCE;
     }
 
     @Override
     public PyObject pyDivide(PyObject other) {
-        return null;
+        if (other instanceof PyInt otherInt) {
+            if (bigValue == null && otherInt.bigValue == null) {
+                // return PyFloat.of((double) smallValue / otherInt.smallValue);
+            } else {
+                if (otherInt.bigIntegerValue().signum() == 0) {
+                    throw new ArithmeticException("division by zero");
+                }
+                var leftBig = bigIntegerValue();
+                var rightBig = otherInt.bigIntegerValue();
+                // TODO: Use float math
+                return new PyInt(0L, leftBig.divide(rightBig));
+            }
+        }
+        return PyNotImplemented.INSTANCE;
     }
 
     @Override
     public PyObject pyFloorDiv(PyObject other) {
-        return null;
+        if (other instanceof PyInt otherInt) {
+            if (bigValue == null && otherInt.bigValue == null) {
+                return PyInt.of(smallValue / otherInt.smallValue);
+            } else {
+                if (otherInt.bigIntegerValue().signum() == 0) {
+                    throw new ArithmeticException("division by zero");
+                }
+                var leftBig = bigIntegerValue();
+                var rightBig = otherInt.bigIntegerValue();
+                return new PyInt(0L, leftBig.divide(rightBig));
+            }
+        }
+        return PyNotImplemented.INSTANCE;
     }
 
     @Override
     public PyObject pyLShift(PyObject other) {
-        return null;
+        if (other instanceof PyInt otherInt) {
+            var shift = otherInt.bigIntegerValue();
+            if (shift.signum() < 0) {
+                throw new ArithmeticException("negative shift count");
+            }
+            if (bigValue == null && otherInt.bigValue == null && shift.bitLength() < 63) {
+                try {
+                    long shiftAmount = shift.longValueExact();
+                    var result = smallValue << shiftAmount;
+                    if (shiftAmount > 0 && (smallValue << (shiftAmount - 1)) == (result >> 1)) {
+                        return PyInt.of(result);
+                    }
+                } catch (ArithmeticException e) {
+                    // Fall through to BigInteger
+                }
+            }
+            var leftBig = bigIntegerValue();
+            return new PyInt(0L, leftBig.shiftLeft(shift.intValueExact()));
+        }
+        return PyNotImplemented.INSTANCE;
     }
 
     @Override
     public PyObject pyMultiply(PyObject other) {
-        return null;
+        if (other instanceof PyInt otherInt) {
+            if (bigValue == null && otherInt.bigValue == null) {
+                try {
+                    return PyInt.of(Math.multiplyExact(smallValue, otherInt.smallValue));
+                } catch (ArithmeticException e) {
+                    // Done outside the if
+                }
+            }
+            var leftBig = bigIntegerValue();
+            var rightBig = otherInt.bigIntegerValue();
+            return new PyInt(0L, leftBig.multiply(rightBig));
+        }
+        return PyNotImplemented.INSTANCE;
     }
 
     @Override
     public PyObject pyPow(PyObject other) {
-        return null;
+        if (other instanceof PyInt otherInt) {
+            var exp = otherInt.bigIntegerValue();
+            if (exp.signum() < 0) {
+                throw new ArithmeticException("negative exponent");
+            }
+            var leftBig = bigIntegerValue();
+            return new PyInt(0L, leftBig.pow(exp.intValueExact()));
+        }
+        return PyNotImplemented.INSTANCE;
     }
 
     @Override
     public PyObject pyRShift(PyObject other) {
-        return null;
+        if (other instanceof PyInt otherInt) {
+            var shift = otherInt.bigIntegerValue();
+            if (shift.signum() < 0) {
+                throw new ArithmeticException("negative shift count");
+            }
+            if (bigValue == null && otherInt.bigValue == null && shift.bitLength() < 63) {
+                try {
+                    long shiftAmount = shift.longValueExact();
+                    return PyInt.of(smallValue >> shiftAmount);
+                } catch (ArithmeticException e) {
+                    // Fall through to BigInteger
+                }
+            }
+            var leftBig = bigIntegerValue();
+            return new PyInt(0L, leftBig.shiftRight(shift.intValueExact()));
+        }
+        return PyNotImplemented.INSTANCE;
     }
 
     @Override
     public PyObject pySubtract(PyObject other) {
-        return null;
+        if (other instanceof PyInt otherInt) {
+            if (bigValue == null && otherInt.bigValue == null) {
+                try {
+                    return PyInt.of(Math.subtractExact(smallValue, otherInt.smallValue));
+                } catch (ArithmeticException e) {
+                    // Done outside the if
+                }
+            }
+            var leftBig = bigIntegerValue();
+            var rightBig = otherInt.bigIntegerValue();
+            return new PyInt(0L, leftBig.subtract(rightBig));
+        }
+        return PyNotImplemented.INSTANCE;
     }
 }
