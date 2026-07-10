@@ -39,11 +39,12 @@ def _convert_py_constant(value):
             out.add(_convert_py_constant(item))
         return out
     if isinstance(value, tuple):
+        AList = _jclass("java.util.ArrayList")
         PyTuple = _jclass("io.github.cdisvm.runtime.builtin.PyTuple")
-        out = PyTuple()
+        out = AList()
         for item in value:
             out.add(_convert_py_constant(item))
-        return out
+        return PyTuple(out)
     if isinstance(value, dict):
         PyDict = _jclass("io.github.cdisvm.runtime.builtin.PyDict")
         out = PyDict()
