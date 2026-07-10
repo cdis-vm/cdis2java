@@ -29,4 +29,19 @@ public class PyList<T extends PyObject> extends PySequenceBase<T> implements PyS
         }
         delegate.set(index, (T) value);
     }
+
+    @Override
+    public String toString() {
+        var out = new StringBuilder();
+        out.append('[');
+        for (var item : delegate) {
+            out.append(item);
+            out.append(',');
+        }
+        if (!delegate.isEmpty()) {
+            out.deleteCharAt(out.length() - 1);
+        }
+        out.append(']');
+        return out.toString();
+    }
 }

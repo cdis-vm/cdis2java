@@ -53,4 +53,9 @@ public record PyBool(boolean value) implements PyConstant {
     public PyBool negate() {
         return value? FALSE : TRUE;
     }
+
+    @Override
+    public String toString() {
+        return Boolean.toString(value);
+    }
 }

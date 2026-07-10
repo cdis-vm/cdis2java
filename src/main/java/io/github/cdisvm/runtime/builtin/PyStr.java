@@ -50,4 +50,9 @@ public record PyStr(String value) implements PyConstant, PyContainer {
         }
         return PyBool.of(value.contains(otherStr.value));
     }
+
+    @Override
+    public String toString() {
+        return value;
+    }
 }

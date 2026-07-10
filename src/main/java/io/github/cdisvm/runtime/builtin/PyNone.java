@@ -19,4 +19,9 @@ public record PyNone() implements PyConstant {
     public String getJavaIdentifierName() {
         return "PyNone_INSTANT";
     }
+
+    @Override
+    public String toString() {
+        return "None";
+    }
 }

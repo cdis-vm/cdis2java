@@ -94,4 +94,19 @@ public record PySet<Item_ extends PyObject>(SequencedSet<Item_> delegate) implem
     public void clear() {
         delegate.clear();
     }
+
+    @Override
+    public String toString() {
+        var out = new StringBuilder();
+        out.append('{');
+        for (var item : delegate) {
+            out.append(item);
+            out.append(',');
+        }
+        if (!delegate.isEmpty()) {
+            out.deleteCharAt(out.length() - 1);
+        }
+        out.append('}');
+        return out.toString();
+    }
 }

@@ -429,4 +429,32 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
         }
         return PyBool.of(!bigIntegerValue().equals(otherInt.bigIntegerValue()));
     }
+
+    @Override
+    public String toString() {
+        if (bigValue == null) {
+            return Long.toString(smallValue);
+        }
+        return bigValue.toString();
+    }
+
+    @Override
+    public int hashCode() {
+        if (bigValue == null) {
+            return Long.hashCode(smallValue);
+        }
+        return bigValue.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof PyInt other) {
+            if (bigValue == null && other.bigValue == null) {
+                return smallValue == other.smallValue;
+            } else {
+                return bigIntegerValue().equals(other.bigIntegerValue());
+            }
+        }
+        return false;
+    }
 }
