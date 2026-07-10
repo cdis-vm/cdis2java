@@ -20,6 +20,7 @@ import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySettable;
 import io.github.cdisvm.runtime.PySizable;
 import io.github.cdisvm.runtime.PyType;
+import io.github.cdisvm.runtime.exception.PyIndexError;
 
 @NullMarked
 public class PySequenceBase<T extends PyObject> implements PyObject, PyGettable, PyContainer,
@@ -177,7 +178,7 @@ public class PySequenceBase<T extends PyObject> implements PyObject, PyGettable,
         }
         if (index < 0 || index >= delegate.size()) {
             // TODO: Throw IndexError instead
-            throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + delegate.size());
+            throw new PyIndexError("Index: " + index + ", Size: " + delegate.size());
         }
         return delegate.get(index);
     }

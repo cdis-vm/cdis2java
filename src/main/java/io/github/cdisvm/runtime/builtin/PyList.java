@@ -5,6 +5,7 @@ import java.util.List;
 import io.github.cdisvm.runtime.PyIndexable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySettable;
+import io.github.cdisvm.runtime.exception.PyIndexError;
 
 public class PyList<T extends PyObject> extends PySequenceBase<T> implements PySettable {
 
@@ -24,8 +25,7 @@ public class PyList<T extends PyObject> extends PySequenceBase<T> implements PyS
             index = delegate.size() + index;
         }
         if (index < 0 || index >= delegate.size()) {
-            // TODO: Throw IndexError instead
-            throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + delegate.size());
+            throw new PyIndexError("Index: " + index + ", Size: " + delegate.size());
         }
         delegate.set(index, (T) value);
     }

@@ -3,27 +3,28 @@ package io.github.cdisvm.runtime.binary;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.binary.right.PyRightBitXorAble;
 import io.github.cdisvm.runtime.builtin.PyNotImplemented;
+import io.github.cdisvm.runtime.exception.PyTypeError;
 
 public interface PyBitXorAble {
     PyObject pyBitXor(PyObject other);
 
     static PyObject bitXor(PyObject left, PyObject right) {
         if (!(left instanceof PyBitXorAble) && !(right instanceof PyRightBitXorAble)) {
-            throw new UnsupportedOperationException();
+            throw new PyTypeError();
         }
 
         if (!(right instanceof PyRightBitXorAble)) {
             var castedLeft = (PyBitXorAble) left;
             var result = castedLeft.pyBitXor(right);
             if (result == PyNotImplemented.INSTANCE) {
-                throw new UnsupportedOperationException();
+                throw new PyTypeError();
             }
             return result;
         } else if (!(left instanceof PyBitXorAble)) {
             var castedRight = (PyRightBitXorAble) right;
             var result = castedRight.pyRightBitXor(left);
             if (result == PyNotImplemented.INSTANCE) {
-                throw new UnsupportedOperationException();
+                throw new PyTypeError();
             }
             return result;
         } else {
@@ -36,7 +37,7 @@ public interface PyBitXorAble {
                     var castedLeft = (PyBitXorAble) left;
                     result = castedLeft.pyBitXor(right);
                     if (result == PyNotImplemented.INSTANCE) {
-                        throw new UnsupportedOperationException();
+                        throw new PyTypeError();
                     }
                     return result;
                 }
@@ -48,7 +49,7 @@ public interface PyBitXorAble {
                     var castedRight = (PyRightBitXorAble) right;
                     result = castedRight.pyRightBitXor(left);
                     if (result == PyNotImplemented.INSTANCE) {
-                        throw new UnsupportedOperationException();
+                        throw new PyTypeError();
                     }
                 }
                 return result;

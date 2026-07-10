@@ -56,6 +56,9 @@ def _convert_py_constant(value):
         for item in value:
             out.add(_convert_py_constant(item))
         return out
+    if isinstance(value, BaseException):
+        java_type = _jclass(f"io.github.cdisvm.runtime.exception.Py{type(value).__name__}")
+        return java_type(*(_convert_py_constant(arg) for arg in value.args))
     if isinstance(value, CellType):
         return _convert_py_constant(value.cell_contents)
 
@@ -417,6 +420,7 @@ def py_value(value):
     PyTuple = _jclass("io.github.cdisvm.runtime.builtin.PyTuple")
     PyDict = _jclass("io.github.cdisvm.runtime.builtin.PyDict")
     PySet = _jclass("io.github.cdisvm.runtime.builtin.PySet")
+    PyBaseException = _jclass("io.github.cdisvm.runtime.exception.PyBaseException")
 
     if isinstance(value, PyBool):
         return value.value()
@@ -434,5 +438,10 @@ def py_value(value):
         return {py_value(v) for v in value}
     if isinstance(value, PyNone):
         return None
+    if isinstance(value, PyBaseException):
+        import builtins
+        python_error_class_name = str(value.getClass().getSimpleName())[2:]
+        python_error_class = getattr(builtins, python_error_class_name)
+        return python_error_class(*py_value(value.args))
 
     raise ValueError(f"Unsupported constant type: {type(value)}")

@@ -8,6 +8,7 @@ import io.github.cdisvm.compiler.CompilationRun;
 import io.github.cdisvm.compiler.MD;
 import io.github.cdisvm.compiler.StackMetadata;
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.exception.PyValueError;
 
 /**
  * Pops off the top of stack, and pushes its elements onto the stack in reversed order.
@@ -68,7 +69,6 @@ public record UnpackElements(int beforeCount,
     }
 
     private void implementWithoutExtras(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
-        // TODO: raise ValueError instead
         new GetIterator().implement(codeBuilder, compilationRun, stackMetadata);
         var tooFewElementsLabel = codeBuilder.newLabel();
         for (var i = 0; i < beforeCount; i++) {
@@ -85,17 +85,17 @@ public record UnpackElements(int beforeCount,
         codeBuilder.if_acmpeq(exactElementsLabel);
 
         // Too many elements
-        codeBuilder.new_(CD.of(RuntimeException.class));
+        codeBuilder.new_(CD.of(PyValueError.class));
         codeBuilder.dup();
-        codeBuilder.invokespecial(CD.of(RuntimeException.class), "<init>", MD.of(void.class));
+        codeBuilder.invokespecial(CD.of(PyValueError.class), "<init>", MD.of(void.class));
         codeBuilder.athrow();
 
         // To few elements
         codeBuilder.labelBinding(tooFewElementsLabel);
         codeBuilder.pop();
-        codeBuilder.new_(CD.of(RuntimeException.class));
+        codeBuilder.new_(CD.of(PyValueError.class));
         codeBuilder.dup();
-        codeBuilder.invokespecial(CD.of(RuntimeException.class), "<init>", MD.of(void.class));
+        codeBuilder.invokespecial(CD.of(PyValueError.class), "<init>", MD.of(void.class));
         codeBuilder.athrow();
 
         // Exact number of elements
@@ -135,17 +135,17 @@ public record UnpackElements(int beforeCount,
         codeBuilder.loadConstant(afterCount);
         codeBuilder.if_icmpge(enoughElementsLabel);
         // Too few (not enough for after) elements
-        codeBuilder.new_(CD.of(RuntimeException.class));
+        codeBuilder.new_(CD.of(PyValueError.class));
         codeBuilder.dup();
-        codeBuilder.invokespecial(CD.of(RuntimeException.class), "<init>", MD.of(void.class));
+        codeBuilder.invokespecial(CD.of(PyValueError.class), "<init>", MD.of(void.class));
         codeBuilder.athrow();
 
         // To few elements (not enough for before)
         codeBuilder.labelBinding(tooFewElementsLabel);
         codeBuilder.pop();
-        codeBuilder.new_(CD.of(RuntimeException.class));
+        codeBuilder.new_(CD.of(PyValueError.class));
         codeBuilder.dup();
-        codeBuilder.invokespecial(CD.of(RuntimeException.class), "<init>", MD.of(void.class));
+        codeBuilder.invokespecial(CD.of(PyValueError.class), "<init>", MD.of(void.class));
         codeBuilder.athrow();
 
         codeBuilder.labelBinding(enoughElementsLabel);

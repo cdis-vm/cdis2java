@@ -11,6 +11,7 @@ import io.github.cdisvm.runtime.PyGettable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySettable;
 import io.github.cdisvm.runtime.PySizable;
+import io.github.cdisvm.runtime.exception.PyKeyError;
 
 public record PyDict<Key_ extends PyObject, Value_ extends PyObject>(SequencedMap<Key_, Value_> delegate) implements
         PyObject, PySizable, PyContainer, PyGettable, PySettable, SequencedMap<Key_, Value_> {
@@ -32,8 +33,7 @@ public record PyDict<Key_ extends PyObject, Value_ extends PyObject>(SequencedMa
     public PyObject pyGetItem(PyObject item) {
         var out = delegate.get(item);
         if (out == null) {
-            // TODO: throw KeyError instead
-            throw new RuntimeException();
+            throw new PyKeyError();
         }
         return out;
     }

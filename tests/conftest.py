@@ -32,7 +32,8 @@ def create_function_match_asserter(function):
                 function(*args, **kwargs)
             except Exception as py_exception:
                 py_error = py_exception
-            assert py_value(java_exception) == py_error
+
+            assert type(py_value(java_exception)) == type(py_error)
             return None
         assert out == function(*args, **kwargs)
         return out

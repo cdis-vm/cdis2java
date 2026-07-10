@@ -3,27 +3,28 @@ package io.github.cdisvm.runtime.binary;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.binary.right.PyRightSubtractable;
 import io.github.cdisvm.runtime.builtin.PyNotImplemented;
+import io.github.cdisvm.runtime.exception.PyTypeError;
 
 public interface PySubtractable {
     PyObject pySubtract(PyObject other);
 
     static PyObject subtract(PyObject left, PyObject right) {
         if (!(left instanceof PySubtractable) && !(right instanceof PyRightSubtractable)) {
-            throw new UnsupportedOperationException();
+            throw new PyTypeError();
         }
 
         if (!(right instanceof PyRightSubtractable)) {
             var castedLeft = (PySubtractable) left;
             var result = castedLeft.pySubtract(right);
             if (result == PyNotImplemented.INSTANCE) {
-                throw new UnsupportedOperationException();
+                throw new PyTypeError();
             }
             return result;
         } else if (!(left instanceof PySubtractable)) {
             var castedRight = (PyRightSubtractable) right;
             var result = castedRight.pyRightSubtract(left);
             if (result == PyNotImplemented.INSTANCE) {
-                throw new UnsupportedOperationException();
+                throw new PyTypeError();
             }
             return result;
         } else {
@@ -36,7 +37,7 @@ public interface PySubtractable {
                     var castedLeft = (PySubtractable) left;
                     result = castedLeft.pySubtract(right);
                     if (result == PyNotImplemented.INSTANCE) {
-                        throw new UnsupportedOperationException();
+                        throw new PyTypeError();
                     }
                     return result;
                 }
@@ -48,7 +49,7 @@ public interface PySubtractable {
                     var castedRight = (PyRightSubtractable) right;
                     result = castedRight.pyRightSubtract(left);
                     if (result == PyNotImplemented.INSTANCE) {
-                        throw new UnsupportedOperationException();
+                        throw new PyTypeError();
                     }
                 }
                 return result;

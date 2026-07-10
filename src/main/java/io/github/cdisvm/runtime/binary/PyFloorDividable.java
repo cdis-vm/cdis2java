@@ -3,27 +3,28 @@ package io.github.cdisvm.runtime.binary;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.binary.right.PyRightFloorDividable;
 import io.github.cdisvm.runtime.builtin.PyNotImplemented;
+import io.github.cdisvm.runtime.exception.PyTypeError;
 
 public interface PyFloorDividable {
     PyObject pyFloorDiv(PyObject other);
 
     static PyObject floorDivide(PyObject left, PyObject right) {
         if (!(left instanceof PyFloorDividable) && !(right instanceof PyRightFloorDividable)) {
-            throw new UnsupportedOperationException();
+            throw new PyTypeError();
         }
 
         if (!(right instanceof PyRightFloorDividable)) {
             var castedLeft = (PyFloorDividable) left;
             var result = castedLeft.pyFloorDiv(right);
             if (result == PyNotImplemented.INSTANCE) {
-                throw new UnsupportedOperationException();
+                throw new PyTypeError();
             }
             return result;
         } else if (!(left instanceof PyFloorDividable)) {
             var castedRight = (PyRightFloorDividable) right;
             var result = castedRight.pyRightFloorDiv(left);
             if (result == PyNotImplemented.INSTANCE) {
-                throw new UnsupportedOperationException();
+                throw new PyTypeError();
             }
             return result;
         } else {
@@ -36,7 +37,7 @@ public interface PyFloorDividable {
                     var castedLeft = (PyFloorDividable) left;
                     result = castedLeft.pyFloorDiv(right);
                     if (result == PyNotImplemented.INSTANCE) {
-                        throw new UnsupportedOperationException();
+                        throw new PyTypeError();
                     }
                     return result;
                 }
@@ -48,7 +49,7 @@ public interface PyFloorDividable {
                     var castedRight = (PyRightFloorDividable) right;
                     result = castedRight.pyRightFloorDiv(left);
                     if (result == PyNotImplemented.INSTANCE) {
-                        throw new UnsupportedOperationException();
+                        throw new PyTypeError();
                     }
                 }
                 return result;

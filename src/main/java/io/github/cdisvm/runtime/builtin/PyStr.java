@@ -11,8 +11,10 @@ import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyContainer;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
+import io.github.cdisvm.runtime.binary.PyAddable;
+import io.github.cdisvm.runtime.exception.PyTypeError;
 
-public record PyStr(String value) implements PyConstant, PyContainer {
+public record PyStr(String value) implements PyConstant, PyContainer, PyAddable {
     @Override
     public void loadValueOntoStack(CodeBuilder codeBuilder) {
         codeBuilder.new_(ClassDesc.of(PyStr.class.getCanonicalName()));
@@ -45,8 +47,7 @@ public record PyStr(String value) implements PyConstant, PyContainer {
     @Override
     public PyBool pyHasItem(PyObject item) {
         if (!(item instanceof PyStr otherStr)) {
-            // TODO: Throw TypeError instead
-            throw new UnsupportedOperationException();
+            throw new PyTypeError();
         }
         return PyBool.of(value.contains(otherStr.value));
     }
@@ -54,5 +55,13 @@ public record PyStr(String value) implements PyConstant, PyContainer {
     @Override
     public String toString() {
         return value;
+    }
+
+    @Override
+    public PyObject pyAdd(PyObject other) {
+        if (other instanceof PyStr) {
+            return new PyStr(value.concat(((PyStr) other).value));
+        }
+        return PyNotImplemented.INSTANCE;
     }
 }

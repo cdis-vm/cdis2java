@@ -36,6 +36,7 @@ import io.github.cdisvm.runtime.comparison.PyHasGreaterThanOrEqual;
 import io.github.cdisvm.runtime.comparison.PyHasLessThan;
 import io.github.cdisvm.runtime.comparison.PyHasLessThanOrEqual;
 import io.github.cdisvm.runtime.comparison.PyHasNotEquals;
+import io.github.cdisvm.runtime.exception.PyZeroDivisionError;
 
 @NullMarked
 public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements PyObject,
@@ -203,7 +204,7 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
                 // return PyFloat.of((double) smallValue / otherInt.smallValue);
             } else {
                 if (otherInt.bigIntegerValue().signum() == 0) {
-                    throw new ArithmeticException("division by zero");
+                    throw new PyZeroDivisionError("division by zero");
                 }
                 var leftBig = bigIntegerValue();
                 var rightBig = otherInt.bigIntegerValue();
@@ -221,7 +222,7 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
                 return PyInt.of(smallValue / otherInt.smallValue);
             } else {
                 if (otherInt.bigIntegerValue().signum() == 0) {
-                    throw new ArithmeticException("division by zero");
+                    throw new PyZeroDivisionError("division by zero");
                 }
                 var leftBig = bigIntegerValue();
                 var rightBig = otherInt.bigIntegerValue();
@@ -241,7 +242,7 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
                 var rightBig = otherInt.bigIntegerValue();
                 var signum = rightBig.signum();
                 if (signum == 0) {
-                    throw new ArithmeticException("division by zero");
+                    throw new PyZeroDivisionError("division by zero");
                 }
                 // TODO: is the math collect for when RHS negative?
                 return new PyInt(0L, signum == 1? leftBig.mod(rightBig) : leftBig.mod(rightBig.negate()).negate());
