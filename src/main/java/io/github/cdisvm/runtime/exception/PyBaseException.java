@@ -22,6 +22,11 @@ public class PyBaseException extends RuntimeException {
         args = PyTuple.of(new PyStr(message));
     }
 
+    public PyBaseException(PyStr message) {
+        super(message.value());
+        args = PyTuple.of(message);
+    }
+
     public PyBaseException(PyTuple<PyObject> args) {
         super(args.isEmpty()? "" : args.toString());
         this.args = args;
