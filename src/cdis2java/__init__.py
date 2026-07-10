@@ -377,7 +377,10 @@ def _convert_bytecode(bc):
 
     for key, value in bc.closure.items():
         # value is a cell
-        closure.put(key, JCell(id(value), _convert_py_constant(value)))
+        try:
+            closure.put(key, JCell(id(value), _convert_py_constant(value)))
+        except ValueError:
+            closure.put(key, JCell(id(value)))
 
     globals_map = _jclass("java.util.HashMap")()
     free_names = _py_set_to_java(bc.free_names)

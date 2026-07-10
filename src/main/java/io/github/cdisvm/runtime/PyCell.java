@@ -15,6 +15,11 @@ public final class PyCell {
         this.value = null;
     }
 
+    public PyCell(long cellId) {
+        this.cellId = cellId;
+        this.value = null;
+    }
+
     public PyCell(long cellId, PyObject value) {
         this.cellId = cellId;
         this.value = value;

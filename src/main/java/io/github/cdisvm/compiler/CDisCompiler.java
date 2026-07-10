@@ -67,7 +67,7 @@ public class CDisCompiler {
         if (cellIdToCellClass.containsKey(cellId)) {
             return cellIdToCellClass.get(cellId);
         }
-        if (!(value instanceof PyConstant constant)) {
+        if (value != null && !(value instanceof PyConstant)) {
             throw new IllegalArgumentException("Cannot convert initial value to a constant.");
         }
 
@@ -80,7 +80,12 @@ public class CDisCompiler {
                 codeBuilder.new_(CD.PY_CELL);
                 codeBuilder.dup();
                 codeBuilder.loadConstant(cellId);
-                constant.loadValueOntoStack(codeBuilder);
+                if (value == null) {
+                    codeBuilder.aconst_null();
+                } else {
+                    var constant = (PyConstant) value;
+                    constant.loadValueOntoStack(codeBuilder);
+                }
                 codeBuilder.invokespecial(CD.PY_CELL, "<init>", MD.of(void.class, long.class, PyObject.class));
                 codeBuilder.putstatic(cellClassDesc, PyCell.CELL_FIELD_NAME, CD.PY_CELL);
                 codeBuilder.return_();

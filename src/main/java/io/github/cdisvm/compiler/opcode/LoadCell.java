@@ -7,6 +7,8 @@ import io.github.cdisvm.compiler.CompilationRun;
 import io.github.cdisvm.compiler.MD;
 import io.github.cdisvm.compiler.StackMetadata;
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.exception.PyNameError;
+import io.github.cdisvm.runtime.exception.PyUnboundLocalError;
 
 /**
  * Loads a cell variable onto the stack.
@@ -41,6 +43,20 @@ public record LoadCell(String cellName) implements Opcode, HasCell {
         var slot = compilationRun.getVariableSlot(cellName);
         codeBuilder.aload(slot);
         codeBuilder.invokevirtual(CD.PY_CELL, "getValue", MD.of(PyObject.class));
-        // TODO: check if variable exists
+
+        codeBuilder.dup();
+        codeBuilder.aconst_null();
+        var variableExistsLabel = codeBuilder.newLabel();
+        codeBuilder.if_acmpne(variableExistsLabel);
+
+        // variable does not exist or was deleted
+        codeBuilder.pop();
+        codeBuilder.new_(CD.of(PyNameError.class));
+        codeBuilder.dup();
+        codeBuilder.invokespecial(CD.of(PyNameError.class), "<init>",
+                MD.of(void.class));
+        codeBuilder.athrow();
+
+        codeBuilder.labelBinding(variableExistsLabel);
     }
 }
