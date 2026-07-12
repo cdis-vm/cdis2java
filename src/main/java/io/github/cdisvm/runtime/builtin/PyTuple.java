@@ -4,7 +4,9 @@ import java.util.Collections;
 import java.util.List;
 
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.annotation.PyBuiltin;
 
+@PyBuiltin("tuple")
 public class PyTuple<T extends PyObject> extends PySequenceBase<T> {
     private static final PyTuple<?> EMPTY = new PyTuple<>(Collections.emptyList());
 

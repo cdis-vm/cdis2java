@@ -23,6 +23,7 @@ public record Bytecode(
         @Nullable Bytecode annotateFunction,
         Map<String, PyCell> closure,
         Map<String, PyObject> globals,
+        long globalsId,
         Set<String> freeNames
 ) {
 }

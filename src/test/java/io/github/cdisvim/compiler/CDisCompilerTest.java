@@ -27,7 +27,6 @@ import io.github.cdisvm.compiler.opcode.LoadLocal;
 import io.github.cdisvm.compiler.opcode.ReturnValue;
 import io.github.cdisvm.compiler.opcode.WithKeywordArg;
 import io.github.cdisvm.runtime.PyCallable;
-import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.builtin.PyStr;
 import io.github.cdisvm.runtime.PyType;
 
@@ -68,7 +67,7 @@ class CDisCompilerTest {
                 null,
                 Map.of(),
                 Map.of(),
-                Set.of()
+                0L, Set.of()
         );
         var callable = compiler.compile(bytecode);
         var expected = "test data";
@@ -99,7 +98,7 @@ class CDisCompilerTest {
                 null,
                 Map.of(),
                 Map.of(),
-                Set.of()
+                0L, Set.of()
         );
         var callable = compiler.compile(bytecode);
         var expected = "return";
@@ -131,7 +130,7 @@ class CDisCompilerTest {
                 null,
                 Map.of(),
                 Map.of(),
-                Set.of()
+                0L, Set.of()
         );
         var callable = compiler.compile(callableBytecode);
 
@@ -163,7 +162,7 @@ class CDisCompilerTest {
                 null,
                 Map.of(),
                 Map.of(),
-                Set.of()
+                0L, Set.of()
         );
         var function = compiler.compile(functionBytecode);
 

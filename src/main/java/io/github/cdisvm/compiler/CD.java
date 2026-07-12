@@ -7,6 +7,7 @@ import java.util.List;
 import io.github.cdisvm.runtime.PyCallBuilder;
 import io.github.cdisvm.runtime.PyCallable;
 import io.github.cdisvm.runtime.PyCell;
+import io.github.cdisvm.runtime.PyGlobal;
 import io.github.cdisvm.runtime.PyIterable;
 import io.github.cdisvm.runtime.PyIterator;
 import io.github.cdisvm.runtime.PyObject;
@@ -31,9 +32,13 @@ public final class CD {
     public static final ClassDesc PY_DICT= CD.of(PyDict.class);
     public static final ClassDesc PY_SET = CD.of(PySet.class);
     public static final ClassDesc PY_CELL = CD.of(PyCell.class);
+    public static final ClassDesc PY_GLOBAL = CD.of(PyGlobal.class);
     public static final ClassDesc PY_BOOL = CD.of(PyBool.class);
     public static final ClassDesc PY_ITERABLE = CD.of(PyIterable.class);
     public static final ClassDesc PY_ITERATOR = CD.of(PyIterator.class);
+    // class is generated at runtime
+    public static final String PY_BUILTINS_NAME = "io.github.cdisvm.codegen.builtins.PyBuiltins";
+    public static final ClassDesc PY_BUILTINS = ClassDesc.of(PY_BUILTINS_NAME);
 
     private CD() {}
 

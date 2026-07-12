@@ -398,6 +398,7 @@ def _convert_bytecode(bc):
         annotate_function,
         closure,
         globals_map,
+        id(globals_map),
         free_names,
     )
 

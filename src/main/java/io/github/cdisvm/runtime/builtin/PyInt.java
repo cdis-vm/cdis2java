@@ -18,6 +18,7 @@ import io.github.cdisvm.runtime.PyInvertible;
 import io.github.cdisvm.runtime.PyNegatable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
+import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.binary.PyAddable;
 import io.github.cdisvm.runtime.binary.PyBitAndAble;
 import io.github.cdisvm.runtime.binary.PyBitOrAble;
@@ -39,6 +40,7 @@ import io.github.cdisvm.runtime.comparison.PyHasNotEquals;
 import io.github.cdisvm.runtime.exception.PyZeroDivisionError;
 
 @NullMarked
+@PyBuiltin("int")
 public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements PyObject,
         PyIndexable, PyConstant, PyAddable, PySubtractable, PyMultipliable, PyDividable,
         PyModuloAble, PyFloorDividable, PyLShiftable, PyRShiftable, PyPowAble, PyBitOrAble,

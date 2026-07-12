@@ -2,6 +2,7 @@ package io.github.cdisvm.compiler;
 
 import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.ClassFile;
+import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.TypeKind;
 import java.lang.classfile.attribute.MethodParameterInfo;
 import java.lang.classfile.attribute.MethodParametersAttribute;
@@ -20,27 +21,74 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import org.jspecify.annotations.Nullable;
 
+import io.github.cdisvm.compiler.opcode.HasGlobal;
 import io.github.cdisvm.compiler.opcode.LoadConstant;
 import io.github.cdisvm.runtime.PyCallable;
 import io.github.cdisvm.runtime.PyCell;
 import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyGlobal;
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.annotation.PyBuiltin;
 
 public class CDisCompiler {
 
     private final ClassFile classFile;
     private final CDisClassLoader classLoader;
     private final Map<Long, String> cellIdToCellClass;
+    private final Map<Long, Map<String, String>> globalDictIdToGlobalToClass;
+    private final Set<String> builtinSet;
     private long classIdGenerator;
 
     public CDisCompiler() {
         this.classLoader = new CDisClassLoader();
         this.classFile = ClassFile.of();
         this.cellIdToCellClass = new LinkedHashMap<>();
+        this.globalDictIdToGlobalToClass = new LinkedHashMap<>();
         this.classIdGenerator = 0;
+        this.builtinSet = new LinkedHashSet<>();
+        createBuiltins();
+    }
+
+    public void createBuiltins() {
+        var runtimeClassList = ClasspathScanner.getRuntimeClasses();
+        var bytecode = classFile.build(CD.PY_BUILTINS, classBuilder -> {
+            List<Consumer<CodeBuilder>> classInitializers = new ArrayList<>();
+            for (var runtimeClass : runtimeClassList) {
+                if (runtimeClass.getAnnotation(PyBuiltin.class) != null) {
+                    // TODO
+                    // System.out.println("Found builtin class: " + runtimeClass.getName());
+                }
+                for (var field : runtimeClass.getDeclaredFields()) {
+                    if (field.getAnnotation(PyBuiltin.class) != null) {
+                        var annotation = field.getAnnotation(PyBuiltin.class);
+                        builtinSet.add(annotation.value());
+                        classBuilder.withField(annotation.value(), CD.PY_OBJECT,
+                                Modifier.PUBLIC | Modifier.FINAL | Modifier.STATIC);
+                        try {
+                            var constant = (PyConstant) field.get(null);
+                            classInitializers.add(codeBuilder -> {
+                                constant.loadValueOntoStack(codeBuilder);
+                                codeBuilder.putstatic(CD.PY_BUILTINS, annotation.value(), CD.PY_OBJECT);
+                            });
+                        } catch (IllegalAccessException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+            }
+            classBuilder.withMethodBody("<clinit>", MD.of(void.class), Modifier.PUBLIC | Modifier.STATIC,
+                    codeBuilder -> {
+                        for (var classInitializer : classInitializers) {
+                            classInitializer.accept(codeBuilder);
+                        }
+                        codeBuilder.return_();
+                    });
+        });
+        classLoader.registerClass(CD.PY_BUILTINS_NAME, bytecode);
     }
 
     public void dumpClasses(Path dumpLocation) {
@@ -93,6 +141,36 @@ public class CDisCompiler {
         });
         classLoader.registerClass(cellClass, bytecode);
         return cellClass;
+    }
+
+    public void createGlobalClass(long globalDictId, String globalName, @Nullable PyObject value) {
+        var globalToClass = globalDictIdToGlobalToClass.computeIfAbsent(globalDictId, _ -> new LinkedHashMap<>());
+        if (globalToClass.containsKey(globalName)) {
+            return;
+        }
+
+        var globalClass = PyGlobal.getClassName(globalDictId, globalName);
+        var globalClassDesc = ClassDesc.of(globalClass);
+        var bytecode = classFile.build(globalClassDesc, classBuilder -> {
+            classBuilder.withField(PyGlobal.GLOBAL_FIELD_NAME, CD.PY_GLOBAL, Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+
+            classBuilder.withMethodBody("<clinit>", MethodTypeDesc.of(CD.VOID), Modifier.PUBLIC | Modifier.STATIC, codeBuilder -> {
+                codeBuilder.new_(CD.PY_GLOBAL);
+                codeBuilder.dup();
+                codeBuilder.loadConstant(globalName);
+                codeBuilder.loadConstant(globalDictId);
+                if (value == null) {
+                    codeBuilder.aconst_null();
+                } else {
+                    var constant = (PyConstant) value;
+                    constant.loadValueOntoStack(codeBuilder);
+                }
+                codeBuilder.invokespecial(CD.PY_GLOBAL, "<init>", MD.of(void.class, String.class, long.class, PyObject.class));
+                codeBuilder.putstatic(globalClassDesc, PyGlobal.GLOBAL_FIELD_NAME, CD.PY_GLOBAL);
+                codeBuilder.return_();
+            });
+        });
+        classLoader.registerClass(globalClass, bytecode);
     }
 
     public static String arbitraryTextToJavaIdentifierName(String text) {
@@ -440,9 +518,14 @@ public class CDisCompiler {
             classBuilder.withInterfaces(constantPool.classEntry(CD.PY_CALLABLE));
 
             Map<String, PyConstant> constantMap = new LinkedHashMap<>();
+            Map<String, PyGlobal> globalMap = new LinkedHashMap<>();
             for (var instruction : bytecode.instructions()) {
                 if (instruction.opcode() instanceof LoadConstant(var constant)) {
                     constantMap.put(constant.getJavaIdentifierName(), constant);
+                }
+                if (instruction.opcode() instanceof HasGlobal hasGlobal) {
+                    createGlobalClass(bytecode.globalsId(), hasGlobal.globalName(), bytecode.globals().get(hasGlobal.globalName()));
+                    globalMap.put(hasGlobal.globalName(), new PyGlobal(hasGlobal.globalName(), bytecode.globalsId()));
                 }
             }
 
@@ -478,7 +561,8 @@ public class CDisCompiler {
                 codeBuilder.aload(1);
                 codeBuilder.checkcast(callBuilderClassDescriptor);
                 codeBuilder.astore(2);
-                var compileRun = CompilationRun.init(this, callableClassDescriptor, codeBuilder, bytecode, 3);
+                var compileRun = CompilationRun.init(this, callableClassDescriptor, codeBuilder, bytecode,
+                        globalMap, builtinSet, 3);
 
                 var invalidArgumentsLabel = codeBuilder.newLabel();
 

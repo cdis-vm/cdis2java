@@ -7,9 +7,13 @@ import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
+import io.github.cdisvm.runtime.annotation.PyBuiltin;
 
+@PyBuiltin("bool")
 public record PyBool(boolean value) implements PyConstant {
+    @PyBuiltin("True")
     public static final PyBool TRUE = new PyBool(true);
+    @PyBuiltin("False")
     public static final PyBool FALSE = new PyBool(false);
 
     public static PyBool of(boolean value) {

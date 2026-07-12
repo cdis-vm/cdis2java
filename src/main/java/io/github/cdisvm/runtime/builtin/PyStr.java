@@ -11,9 +11,11 @@ import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyContainer;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
+import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.binary.PyAddable;
 import io.github.cdisvm.runtime.exception.PyTypeError;
 
+@PyBuiltin("str")
 public record PyStr(String value) implements PyConstant, PyContainer, PyAddable {
     @Override
     public void loadValueOntoStack(CodeBuilder codeBuilder) {

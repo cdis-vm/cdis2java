@@ -5,8 +5,10 @@ import java.lang.classfile.Opcode;
 import java.lang.constant.ClassDesc;
 
 import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.annotation.PyBuiltin;
 
 public record PyNotImplemented() implements PyConstant {
+    @PyBuiltin("NotImplemented")
     public static final PyNotImplemented INSTANCE = new PyNotImplemented();
 
     @Override

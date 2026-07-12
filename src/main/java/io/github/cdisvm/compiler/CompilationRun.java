@@ -14,6 +14,7 @@ import org.jspecify.annotations.NullMarked;
 import io.github.cdisvm.compiler.opcode.HasCell;
 import io.github.cdisvm.compiler.opcode.HasTarget;
 import io.github.cdisvm.compiler.opcode.HasVariable;
+import io.github.cdisvm.runtime.PyGlobal;
 
 @NullMarked
 public record CompilationRun(CDisCompiler compiler,
@@ -23,6 +24,8 @@ public record CompilationRun(CDisCompiler compiler,
                              Map<Integer, Label> bytecodeIndexToLabel,
                              Map<String, Integer> variableNameToSlot,
                              Set<String> cellVariableNameSet,
+                             Map<String, PyGlobal> globalMap,
+                             Set<String> builtins,
                              int syntheticStart,
                              int syntheticCount) {
     public static CompilationRun init(
@@ -30,6 +33,8 @@ public record CompilationRun(CDisCompiler compiler,
             ClassDesc callableClassDesc,
             CodeBuilder codeBuilder,
             Bytecode bytecode,
+            Map<String, PyGlobal> globalMap,
+            Set<String> builtins,
             int reservedSlots) {
         var variableNameToSlot  = new LinkedHashMap<String, Integer>();
         var bytecodeIndexToLabel = new LinkedHashMap<Integer, Label>();
@@ -63,7 +68,8 @@ public record CompilationRun(CDisCompiler compiler,
         }
 
         return new CompilationRun(compiler, callableClassDesc, codeBuilder, bytecode, bytecodeIndexToLabel, variableNameToSlot,
-                cellVariableNameSet, reservedSlots + variableNameToSlot.size(),
+                cellVariableNameSet, globalMap, builtins,
+                reservedSlots + variableNameToSlot.size(),
                 bytecode.syntheticCount());
     }
 
