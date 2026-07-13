@@ -1,5 +1,6 @@
 package io.github.cdisvm.compiler;
 
+import java.lang.classfile.ClassElement;
 import java.lang.classfile.CodeBuilder;
 import java.lang.constant.ClassDesc;
 import java.lang.reflect.Modifier;
@@ -25,16 +26,35 @@ import io.github.cdisvm.runtime.annotation.PyVarArgs;
 import io.github.cdisvm.runtime.builtin.PyObjectType;
 import io.github.cdisvm.runtime.builtin.PyTypeType;
 
-public class PyBuiltinCompiler {
+public class PyTypeCompiler {
     private final CDisCompiler cDisCompiler;
     private final Map<Class<?>, PyType> classToCompiledType;
+    private final Map<Class<?>, ClassDesc> classToMarkerInterfaceDesc;
 
-    public PyBuiltinCompiler(CDisCompiler cDisCompiler) {
+    public PyTypeCompiler(CDisCompiler cDisCompiler) {
         this.cDisCompiler = cDisCompiler;
         classToCompiledType = new LinkedHashMap<>();
+        classToMarkerInterfaceDesc = new LinkedHashMap<>();
     }
 
-    public PyType compileType(List<Consumer<CodeBuilder>> initializerList, Class<?> builtinClass) {
+    private ClassDesc getMarkerInterfaceDesc(Class<?> sourceClass) {
+        if (classToMarkerInterfaceDesc.containsKey(sourceClass)) {
+            return classToMarkerInterfaceDesc.get(sourceClass);
+        }
+        var interfaceName = cDisCompiler.createClass("%sMarker".formatted(sourceClass.getSimpleName()), (classDesc, classBuilder) -> {
+            classBuilder.withFlags(Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE);
+            var superInterfaces = new ArrayList<ClassDesc>();
+            if (PyObject.class.isAssignableFrom(sourceClass.getSuperclass())) {
+                superInterfaces.add(getMarkerInterfaceDesc(sourceClass.getSuperclass()));
+            }
+            classBuilder.withInterfaceSymbols(superInterfaces);
+        });
+        var interfaceDesc = ClassDesc.of(interfaceName);
+        classToMarkerInterfaceDesc.put(sourceClass, interfaceDesc);
+        return interfaceDesc;
+    }
+
+    public PyType compileBuiltinType(List<Consumer<CodeBuilder>> initializerList, Class<?> builtinClass) {
         if (classToCompiledType.containsKey(builtinClass)) {
             return classToCompiledType.get(builtinClass);
         }
@@ -42,7 +62,7 @@ public class PyBuiltinCompiler {
         PyType parentType = PyObjectType.INSTANCE;
         if (PyObject.class.isAssignableFrom(builtinClass.getSuperclass()) &&
                 !Modifier.isAbstract(builtinClass.getSuperclass().getModifiers())) {
-            parentType = compileType(initializerList, builtinClass.getSuperclass());
+            parentType = compileBuiltinType(initializerList, builtinClass.getSuperclass());
         }
         var finalParentType = parentType;
 
@@ -85,7 +105,9 @@ public class PyBuiltinCompiler {
         }));
         var constructorCD = CD.of(constructorCallable.getClass());
         var createdClass = cDisCompiler.createClass(builtinClass.getSimpleName() + "Type", (classDesc, classBuilder) -> {
-            classBuilder.withInterfaceSymbols(CD.of(PyType.class), CD.of(PyObject.class), CD.of(PyCallable.class));
+            var markerInterfaceCD = getMarkerInterfaceDesc(builtinClass);
+            classBuilder.withInterfaceSymbols(CD.of(PyType.class), CD.of(PyObject.class), CD.of(PyCallable.class),
+                    markerInterfaceCD);
             classBuilder.withField("INSTANCE", classDesc, Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
             classBuilder.withField("MRO", CD.of(List.class), Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
 
@@ -141,6 +163,19 @@ public class PyBuiltinCompiler {
             classBuilder.withMethodBody("pyType", MD.of(PyType.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.getstatic(CD.of(PyTypeType.class), "INSTANCE", CD.of(PyTypeType.class));
                 codeBuilder.areturn();
+            });
+
+            classBuilder.withMethodBody("instanceCheck", MD.of(boolean.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(1);
+                codeBuilder.invokeinterface(CD.PY_OBJECT, "pyType", MD.of(PyType.class));
+                codeBuilder.instanceOf(markerInterfaceCD);
+                codeBuilder.ireturn();
+            });
+
+            classBuilder.withMethodBody("subclassCheck", MD.of(boolean.class, PyType.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(1);
+                codeBuilder.instanceOf(markerInterfaceCD);
+                codeBuilder.ireturn();
             });
         });
         var createdClassCD = ClassDesc.of(createdClass);

@@ -12,7 +12,6 @@ import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,12 +19,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 import org.jspecify.annotations.Nullable;
 
@@ -43,7 +40,7 @@ public class CDisCompiler {
 
     private final ClassFile classFile;
     private final CDisClassLoader classLoader;
-    private final PyBuiltinCompiler builtinCompiler;
+    private final PyTypeCompiler builtinCompiler;
     private final Map<Long, String> cellIdToCellClass;
     private final Map<Long, Map<String, String>> globalDictIdToGlobalToClass;
     private final Set<String> builtinSet;
@@ -56,7 +53,7 @@ public class CDisCompiler {
         this.globalDictIdToGlobalToClass = new LinkedHashMap<>();
         this.classIdGenerator = 0;
         this.builtinSet = new LinkedHashSet<>();
-        this.builtinCompiler = new PyBuiltinCompiler(this);
+        this.builtinCompiler = new PyTypeCompiler(this);
         createBuiltins();
     }
 
@@ -73,7 +70,7 @@ public class CDisCompiler {
                     var builtinName = runtimeClass.getAnnotation(PyBuiltin.class).value();
                     classBuilder.withField(builtinName, CD.PY_OBJECT,
                             Modifier.PUBLIC | Modifier.FINAL | Modifier.STATIC);
-                    builtinCompiler.compileType(classInitializers, runtimeClass);
+                    builtinCompiler.compileBuiltinType(classInitializers, runtimeClass);
                     builtinSet.add(builtinName);
                 }
                 for (var field : runtimeClass.getDeclaredFields()) {

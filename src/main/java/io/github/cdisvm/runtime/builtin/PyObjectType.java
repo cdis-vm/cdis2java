@@ -10,12 +10,26 @@ import io.github.cdisvm.runtime.exception.PyValueError;
 
 public final class PyObjectType implements PyType {
     public static PyObjectType INSTANCE = new PyObjectType();
+
+    private final List<PyType> MRO;
+
     private PyObjectType() {
+        MRO = List.of(this);
     }
 
     @Override
     public List<PyType> mro() {
-        return List.of(this);
+        return MRO;
+    }
+
+    @Override
+    public boolean instanceCheck(PyObject instance) {
+        return true;
+    }
+
+    @Override
+    public boolean subclassCheck(PyType clazz) {
+        return true;
     }
 
     @Override

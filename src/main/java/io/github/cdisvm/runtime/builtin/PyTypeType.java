@@ -1,5 +1,6 @@
 package io.github.cdisvm.runtime.builtin;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import io.github.cdisvm.runtime.PyAttributes;
@@ -10,11 +11,25 @@ import io.github.cdisvm.runtime.PyType;
 public final class PyTypeType implements PyType {
     public static PyTypeType INSTANCE = new PyTypeType();
 
-    private PyTypeType() {}
+    private final List<PyType> MRO;
+
+    private PyTypeType() {
+        MRO = List.of(this, PyObjectType.INSTANCE);
+    }
 
     @Override
     public List<PyType> mro() {
-        return List.of(this, PyObjectType.INSTANCE);
+        return MRO;
+    }
+
+    @Override
+    public boolean instanceCheck(PyObject instance) {
+        return instance instanceof PyType;
+    }
+
+    @Override
+    public boolean subclassCheck(PyType clazz) {
+        return clazz.mro().contains(this);
     }
 
     @Override

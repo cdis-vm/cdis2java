@@ -11,4 +11,7 @@ public interface PyType extends PyObject, PyCallable {
     }
 
     List<PyType> mro();
+
+    boolean instanceCheck(PyObject instance);
+    boolean subclassCheck(PyType clazz);
 }
