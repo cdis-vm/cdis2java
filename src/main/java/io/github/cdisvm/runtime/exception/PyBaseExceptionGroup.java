@@ -1,8 +1,11 @@
 package io.github.cdisvm.runtime.exception;
 
+import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.builtin.PyTuple;
 import io.github.cdisvm.runtime.PyObject;
 
+@PyBuiltin("BaseExceptionGroup")
 public class PyBaseExceptionGroup extends PyBaseException {
     public final PyBaseException exception;
     public final PyBaseExceptionGroup nested;
@@ -11,5 +14,10 @@ public class PyBaseExceptionGroup extends PyBaseException {
         super(args);
         this.exception = exception;
         this.nested = nested;
+    }
+
+    @PyConstructor
+    public static PyBaseExceptionGroup create(PyTuple<PyObject> args, PyBaseException exception, PyBaseExceptionGroup nested) {
+        return new PyBaseExceptionGroup(args, exception, nested);
     }
 }

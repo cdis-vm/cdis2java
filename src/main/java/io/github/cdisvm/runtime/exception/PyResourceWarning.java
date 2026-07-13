@@ -1,7 +1,11 @@
 package io.github.cdisvm.runtime.exception;
 
+import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.annotation.PyConstructor;
+import io.github.cdisvm.runtime.annotation.PyDefault;
 import io.github.cdisvm.runtime.builtin.PyStr;
 
+@PyBuiltin("ResourceWarning")
 public class PyResourceWarning extends PyWarning {
     public PyResourceWarning() {
         super();
@@ -13,5 +17,11 @@ public class PyResourceWarning extends PyWarning {
 
     public PyResourceWarning(PyStr message) {
         super(message);
+    }
+
+    @PyConstructor
+    public static PyResourceWarning create(
+            @PyDefault(type=PyDefault.Type.STRING, value="") PyStr message) {
+        return new PyResourceWarning(message);
     }
 }
