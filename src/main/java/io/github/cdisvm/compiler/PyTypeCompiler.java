@@ -191,6 +191,7 @@ public class PyTypeCompiler {
         try {
             var compiledType = (PyType) loadedClass.getField("INSTANCE").get(null);
             classToCompiledType.put(builtinClass, compiledType);
+            builtinClass.getField("type").set(null, compiledType);
             return compiledType;
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);

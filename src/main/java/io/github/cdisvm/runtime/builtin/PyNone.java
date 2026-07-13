@@ -5,9 +5,11 @@ import java.lang.classfile.Opcode;
 import java.lang.constant.ClassDesc;
 
 import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 
 public record PyNone() implements PyConstant {
+    public static PyType type;
     @PyBuiltin("None")
     public static final PyNone INSTANCE = new PyNone();
 

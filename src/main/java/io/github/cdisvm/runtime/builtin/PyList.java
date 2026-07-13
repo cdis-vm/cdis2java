@@ -5,13 +5,14 @@ import java.util.List;
 import io.github.cdisvm.runtime.PyIndexable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySettable;
+import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.exception.PyIndexError;
 
 @PyBuiltin("list")
 public class PyList<T extends PyObject> extends PySequenceBase<T> implements PySettable {
-
+    public static PyType type;
     public PyList() {
         super();
     }

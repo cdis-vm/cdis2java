@@ -4,11 +4,13 @@ import java.util.Collections;
 import java.util.List;
 
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
 
 @PyBuiltin("tuple")
 public class PyTuple<T extends PyObject> extends PySequenceBase<T> {
+    public static PyType type;
     private static final PyTuple<?> EMPTY = new PyTuple<>(Collections.emptyList());
 
     @PyConstructor

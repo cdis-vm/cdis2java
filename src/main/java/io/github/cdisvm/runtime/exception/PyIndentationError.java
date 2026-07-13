@@ -4,9 +4,12 @@ import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.annotation.PyDefault;
 import io.github.cdisvm.runtime.builtin.PyStr;
+import io.github.cdisvm.runtime.PyType;
 
 @PyBuiltin("IndentationError")
 public class PyIndentationError extends PySyntaxError {
+    public static PyType type;
+
     public PyIndentationError() {
         super();
     }

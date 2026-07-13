@@ -4,9 +4,12 @@ import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.annotation.PyDefault;
 import io.github.cdisvm.runtime.builtin.PyStr;
+import io.github.cdisvm.runtime.PyType;
 
 @PyBuiltin("UnicodeDecodeError")
 public class PyUnicodeDecodeError extends PyUnicodeError {
+    public static PyType type;
+
     public PyUnicodeDecodeError() {
         super();
     }

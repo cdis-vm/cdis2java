@@ -48,6 +48,7 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
         PyBitAndAble, PyBitXorAble, PyHasPos, PyNegatable, PyInvertible,
         PyHasEquals, PyHasNotEquals, PyHasLessThan, PyHasLessThanOrEqual, PyHasGreaterThan,
         PyHasGreaterThanOrEqual {
+    public static PyType type;
     private static final int CACHE_START = -10;
     private static final int CACHE_END = 256;
     private static final PyInt[] CACHE = generateCache();

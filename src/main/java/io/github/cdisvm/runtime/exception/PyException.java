@@ -6,9 +6,12 @@ import io.github.cdisvm.runtime.annotation.PyVarArgs;
 import io.github.cdisvm.runtime.builtin.PyStr;
 import io.github.cdisvm.runtime.builtin.PyTuple;
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.PyType;
 
 @PyBuiltin("Exception")
 public class PyException extends PyBaseException {
+    public static PyType type;
+
     public PyException() {
         super();
     }

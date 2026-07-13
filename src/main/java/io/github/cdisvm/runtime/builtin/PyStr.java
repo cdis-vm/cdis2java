@@ -18,6 +18,8 @@ import io.github.cdisvm.runtime.exception.PyTypeError;
 
 @PyBuiltin("str")
 public record PyStr(String value) implements PyConstant, PyContainer, PyAddable {
+    public static PyType type;
+
     @PyConstructor
     public static PyStr create() {
         // TODO

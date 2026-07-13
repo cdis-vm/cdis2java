@@ -8,12 +8,14 @@ import java.util.SequencedSet;
 import io.github.cdisvm.runtime.PyContainer;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySizable;
+import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
 
 @PyBuiltin("set")
 public record PySet<Item_ extends PyObject>(SequencedSet<Item_> delegate) implements
         PyObject, PySizable, PyContainer, SequencedSet<Item_> {
+    public static PyType type;
     public PySet() {
         this(new LinkedHashSet<>());
     }

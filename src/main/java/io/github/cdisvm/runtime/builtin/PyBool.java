@@ -12,6 +12,8 @@ import io.github.cdisvm.runtime.annotation.PyConstructor;
 
 @PyBuiltin("bool")
 public record PyBool(boolean value) implements PyConstant {
+    public static PyType type;
+
     @PyBuiltin("True")
     public static final PyBool TRUE = new PyBool(true);
     @PyBuiltin("False")
@@ -53,7 +55,7 @@ public record PyBool(boolean value) implements PyConstant {
 
     @Override
     public PyType pyType() {
-        return null;
+        return type;
     }
 
     @Override

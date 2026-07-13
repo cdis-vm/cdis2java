@@ -11,6 +11,7 @@ import io.github.cdisvm.runtime.PyGettable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySettable;
 import io.github.cdisvm.runtime.PySizable;
+import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.exception.PyKeyError;
@@ -18,6 +19,8 @@ import io.github.cdisvm.runtime.exception.PyKeyError;
 @PyBuiltin("dict")
 public record PyDict<Key_ extends PyObject, Value_ extends PyObject>(SequencedMap<Key_, Value_> delegate) implements
         PyObject, PySizable, PyContainer, PyGettable, PySettable, SequencedMap<Key_, Value_> {
+    public static PyType type;
+
     public PyDict() {
         this(new LinkedHashMap<>());
     }
