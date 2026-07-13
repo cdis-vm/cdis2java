@@ -8,6 +8,7 @@ import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.annotation.PyConstructor;
 
 @PyBuiltin("bool")
 public record PyBool(boolean value) implements PyConstant {
@@ -18,6 +19,12 @@ public record PyBool(boolean value) implements PyConstant {
 
     public static PyBool of(boolean value) {
         return value ? TRUE : FALSE;
+    }
+
+    @PyConstructor
+    public static PyBool create() {
+        // TODO
+        return FALSE;
     }
 
     @Override

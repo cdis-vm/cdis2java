@@ -12,11 +12,18 @@ import io.github.cdisvm.runtime.PyContainer;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.binary.PyAddable;
 import io.github.cdisvm.runtime.exception.PyTypeError;
 
 @PyBuiltin("str")
 public record PyStr(String value) implements PyConstant, PyContainer, PyAddable {
+    @PyConstructor
+    public static PyStr create() {
+        // TODO
+        return new PyStr("");
+    }
+
     @Override
     public void loadValueOntoStack(CodeBuilder codeBuilder) {
         codeBuilder.new_(ClassDesc.of(PyStr.class.getCanonicalName()));

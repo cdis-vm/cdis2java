@@ -1,0 +1,65 @@
+package io.github.cdisvm.runtime.builtin;
+
+import java.util.List;
+
+import io.github.cdisvm.runtime.PyAttributes;
+import io.github.cdisvm.runtime.PyCallBuilder;
+import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.PyType;
+import io.github.cdisvm.runtime.exception.PyValueError;
+
+public final class PyObjectType implements PyType {
+    public static PyObjectType INSTANCE = new PyObjectType();
+    private PyObjectType() {
+    }
+
+    @Override
+    public List<PyType> mro() {
+        return List.of(this);
+    }
+
+    @Override
+    public PyCallBuilder pyCallBuilder() {
+        return new PyCallBuilder() {
+            @Override
+            public PyObject pyCall() {
+                return new PyObject() {
+                    @Override
+                    public PyAttributes pyAttributes() {
+                        return PyEmptyAttributes.INSTANCE;
+                    }
+
+                    @Override
+                    public PyType pyType() {
+                        return PyObjectType.INSTANCE;
+                    }
+                };
+            }
+
+            @Override
+            public PyCallBuilder $appendArgument(PyObject argument) {
+                throw new PyValueError("Too many arguments");
+            }
+
+            @Override
+            public PyCallBuilder $putArgument(String argumentName, PyObject argument) {
+                throw new PyValueError("Too many arguments");
+            }
+        };
+    }
+
+    @Override
+    public PyObject pyCall(PyCallBuilder callBuilder) {
+        return pyCallBuilder().pyCall();
+    }
+
+    @Override
+    public PyType pyType() {
+        return PyTypeType.INSTANCE;
+    }
+
+    @Override
+    public PyAttributes pyAttributes() {
+        return PyEmptyAttributes.INSTANCE;
+    }
+}

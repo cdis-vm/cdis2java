@@ -5,10 +5,17 @@ import java.util.List;
 
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.annotation.PyConstructor;
 
 @PyBuiltin("tuple")
 public class PyTuple<T extends PyObject> extends PySequenceBase<T> {
     private static final PyTuple<?> EMPTY = new PyTuple<>(Collections.emptyList());
+
+    @PyConstructor
+    public static PyTuple<?> create() {
+        //TODO
+        return EMPTY;
+    }
 
     public PyTuple() {
         super(Collections.emptyList());

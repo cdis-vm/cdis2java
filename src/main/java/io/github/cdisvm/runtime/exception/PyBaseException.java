@@ -3,10 +3,14 @@ package io.github.cdisvm.runtime.exception;
 import org.jspecify.annotations.Nullable;
 
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.annotation.PyConstructor;
+import io.github.cdisvm.runtime.annotation.PyVarArgs;
 import io.github.cdisvm.runtime.builtin.PyList;
 import io.github.cdisvm.runtime.builtin.PyStr;
 import io.github.cdisvm.runtime.builtin.PyTuple;
 
+@PyBuiltin("BaseException")
 public class PyBaseException extends RuntimeException {
     public final PyTuple<PyObject> args;
     @Nullable
@@ -30,6 +34,11 @@ public class PyBaseException extends RuntimeException {
     public PyBaseException(PyTuple<PyObject> args) {
         super(args.isEmpty()? "" : args.toString());
         this.args = args;
+    }
+
+    @PyConstructor
+    public static PyBaseException create(@PyVarArgs PyTuple<PyObject> args) {
+        return new PyBaseException(args);
     }
 
     public void add_note(PyStr note) {

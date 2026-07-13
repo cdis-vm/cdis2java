@@ -6,6 +6,7 @@ import io.github.cdisvm.runtime.PyIndexable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySettable;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.exception.PyIndexError;
 
 @PyBuiltin("list")
@@ -17,6 +18,12 @@ public class PyList<T extends PyObject> extends PySequenceBase<T> implements PyS
 
     public PyList(List<T> delegate) {
         super(delegate);
+    }
+
+    @PyConstructor
+    public static PyList<?> create() {
+        // TODO
+        return new PyList<>();
     }
 
     @Override

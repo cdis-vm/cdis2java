@@ -9,12 +9,19 @@ import io.github.cdisvm.runtime.PyContainer;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySizable;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.annotation.PyConstructor;
 
 @PyBuiltin("set")
 public record PySet<Item_ extends PyObject>(SequencedSet<Item_> delegate) implements
         PyObject, PySizable, PyContainer, SequencedSet<Item_> {
     public PySet() {
         this(new LinkedHashSet<>());
+    }
+
+    @PyConstructor
+    public static PySet<?> create() {
+        // TODO
+        return new PySet<>();
     }
 
     @Override

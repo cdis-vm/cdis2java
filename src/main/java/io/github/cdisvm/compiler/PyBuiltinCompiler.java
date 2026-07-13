@@ -1,0 +1,160 @@
+package io.github.cdisvm.compiler;
+
+import java.lang.classfile.CodeBuilder;
+import java.lang.constant.ClassDesc;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.function.Consumer;
+
+import io.github.cdisvm.runtime.PyCallBuilder;
+import io.github.cdisvm.runtime.PyCallable;
+import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.PyType;
+import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.annotation.PyConstructor;
+import io.github.cdisvm.runtime.annotation.PyDefault;
+import io.github.cdisvm.runtime.annotation.PyKwArgs;
+import io.github.cdisvm.runtime.annotation.PyKwOnly;
+import io.github.cdisvm.runtime.annotation.PyPosOnly;
+import io.github.cdisvm.runtime.annotation.PyVarArgs;
+import io.github.cdisvm.runtime.builtin.PyObjectType;
+import io.github.cdisvm.runtime.builtin.PyTypeType;
+
+public class PyBuiltinCompiler {
+    private final CDisCompiler cDisCompiler;
+    private final Map<Class<?>, PyType> classToCompiledType;
+
+    public PyBuiltinCompiler(CDisCompiler cDisCompiler) {
+        this.cDisCompiler = cDisCompiler;
+        classToCompiledType = new LinkedHashMap<>();
+    }
+
+    public PyType compileType(List<Consumer<CodeBuilder>> initializerList, Class<?> builtinClass) {
+        if (classToCompiledType.containsKey(builtinClass)) {
+            return classToCompiledType.get(builtinClass);
+        }
+
+        PyType parentType = PyObjectType.INSTANCE;
+        if (PyObject.class.isAssignableFrom(builtinClass.getSuperclass()) &&
+                !Modifier.isAbstract(builtinClass.getSuperclass().getModifiers())) {
+            parentType = compileType(initializerList, builtinClass.getSuperclass());
+        }
+        var finalParentType = parentType;
+
+        var constructorMethod = Arrays.stream(builtinClass.getMethods())
+                .filter(method -> method.getAnnotation(PyConstructor.class) != null)
+                .findFirst()
+                .orElseThrow(() -> new NoSuchElementException("Class (%s) does not have a constructor".formatted(builtinClass.getSimpleName())));
+
+        var functionSignatureBuilder = FunctionSignature.builder();
+        var parameterIndex = 0;
+        for (var parameter : constructorMethod.getParameters()) {
+            var defaultValue = parameter.getAnnotation(PyDefault.class);
+            var parameterKind = ParameterKind.POSITIONAL_OR_KEYWORD;
+            if (parameter.getAnnotation(PyPosOnly.class) != null) {
+                parameterKind = ParameterKind.POSITIONAL_ONLY;
+            } else if (parameter.getAnnotation(PyKwOnly.class) != null) {
+                parameterKind = ParameterKind.KEYWORD_ONLY;
+            } else if (parameter.getAnnotation(PyVarArgs.class) != null) {
+                parameterKind = ParameterKind.VARGS;
+            } else if (parameter.getAnnotation(PyKwArgs.class) != null) {
+                parameterKind = ParameterKind.KWARGS;
+            }
+            functionSignatureBuilder.param(new FunctionParameter(
+                    parameterIndex,
+                    parameter.getName(),
+                    parameterKind,
+                    PyObjectType.INSTANCE,
+                    (defaultValue != null)? defaultValue.type().getValue(defaultValue.value()) : null
+            ));
+            parameterIndex++;
+        }
+        var functionSignature = functionSignatureBuilder.build();
+        var constructorCallable = cDisCompiler.compile(Bytecode.ofJavaCode(functionSignature, (codeBuilder, compilationRun) -> {
+            for (var parameter : constructorMethod.getParameters()) {
+                codeBuilder.aload(compilationRun.getVariableSlot(parameter.getName()));
+                codeBuilder.checkcast(CD.of(parameter.getType()));
+            }
+            codeBuilder.invokestatic(CD.of(builtinClass), constructorMethod.getName(), MD.of(constructorMethod));
+            codeBuilder.areturn();
+        }));
+        var constructorCD = CD.of(constructorCallable.getClass());
+        var createdClass = cDisCompiler.createClass(builtinClass.getSimpleName() + "Type", (classDesc, classBuilder) -> {
+            classBuilder.withInterfaceSymbols(CD.of(PyType.class), CD.of(PyObject.class), CD.of(PyCallable.class));
+            classBuilder.withField("INSTANCE", classDesc, Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+            classBuilder.withField("MRO", CD.of(List.class), Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+
+            classBuilder.withMethodBody("<clinit>", MD.of(void.class), Modifier.PUBLIC | Modifier.STATIC, codeBuilder -> {
+                codeBuilder.new_(classDesc);
+                codeBuilder.dup();
+                codeBuilder.invokespecial(classDesc, "<init>", MD.of(void.class));
+                codeBuilder.putstatic(classDesc, "INSTANCE", classDesc);
+
+                codeBuilder.new_(CD.of(ArrayList.class));
+                codeBuilder.dup();
+                codeBuilder.invokespecial(CD.of(ArrayList.class), "<init>", MD.of(void.class));
+                codeBuilder.dup();
+                codeBuilder.getstatic(classDesc, "INSTANCE", classDesc);
+                codeBuilder.invokevirtual(CD.of(ArrayList.class), "add", MD.of(boolean.class, Object.class));
+                codeBuilder.pop();
+                for (var mroEntry : finalParentType.mro()) {
+                    var mroEntryCD = CD.of(mroEntry.getClass());
+                    codeBuilder.dup();
+                    codeBuilder.getstatic(mroEntryCD, "INSTANCE", mroEntryCD);
+                    codeBuilder.invokevirtual(CD.of(ArrayList.class), "add", MD.of(boolean.class, Object.class));
+                    codeBuilder.pop();
+                }
+                codeBuilder.putstatic(classDesc, "MRO", CD.of(List.class));
+                codeBuilder.return_();
+            });
+
+            classBuilder.withMethodBody("<init>", MD.of(void.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(0);
+                codeBuilder.invokespecial(CD.OBJECT, "<init>", MD.of(void.class));
+                codeBuilder.return_();
+            });
+
+            classBuilder.withMethodBody("pyCallBuilder", MD.of(PyCallBuilder.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.new_(constructorCD);
+                codeBuilder.dup();
+                codeBuilder.invokespecial(constructorCD, "<init>", MD.of(void.class));
+                codeBuilder.invokeinterface(CD.PY_CALLABLE, "pyCallBuilder", MD.of(PyCallBuilder.class));
+                codeBuilder.areturn();
+            });
+
+            classBuilder.withMethodBody("pyCall", MD.of(PyObject.class, PyCallBuilder.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(1);
+                codeBuilder.invokeinterface(CD.of(PyCallBuilder.class), "pyCall", MD.of(PyObject.class));
+                codeBuilder.areturn();
+            });
+
+            classBuilder.withMethodBody("mro", MD.of(List.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.getstatic(classDesc, "MRO", CD.of(List.class));
+                codeBuilder.areturn();
+            });
+
+            classBuilder.withMethodBody("pyType", MD.of(PyType.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.getstatic(CD.of(PyTypeType.class), "INSTANCE", CD.of(PyTypeType.class));
+                codeBuilder.areturn();
+            });
+        });
+        var createdClassCD = ClassDesc.of(createdClass);
+        initializerList.add(codeBuilder -> {
+            codeBuilder.getstatic(createdClassCD, "INSTANCE", createdClassCD);
+            codeBuilder.putstatic(CD.PY_BUILTINS, builtinClass.getAnnotation(PyBuiltin.class).value(), CD.PY_OBJECT);
+        });
+        var loadedClass = cDisCompiler.loadClass(createdClass);
+        try {
+            var compiledType = (PyType) loadedClass.getField("INSTANCE").get(null);
+            classToCompiledType.put(builtinClass, compiledType);
+            return compiledType;
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}

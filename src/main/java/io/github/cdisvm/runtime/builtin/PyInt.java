@@ -19,6 +19,7 @@ import io.github.cdisvm.runtime.PyNegatable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.binary.PyAddable;
 import io.github.cdisvm.runtime.binary.PyBitAndAble;
 import io.github.cdisvm.runtime.binary.PyBitOrAble;
@@ -50,6 +51,12 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
     private static final int CACHE_START = -10;
     private static final int CACHE_END = 256;
     private static final PyInt[] CACHE = generateCache();
+
+    @PyConstructor
+    public static PyInt create() {
+        // TODO
+        return PyInt.of(0L);
+    }
 
     private static PyInt[] generateCache() {
         var cache = new PyInt[CACHE_END - CACHE_START + 1];

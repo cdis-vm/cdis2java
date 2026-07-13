@@ -12,6 +12,7 @@ import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,9 +20,12 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.jspecify.annotations.Nullable;
 
@@ -33,11 +37,13 @@ import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyGlobal;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.annotation.PyDefault;
 
 public class CDisCompiler {
 
     private final ClassFile classFile;
     private final CDisClassLoader classLoader;
+    private final PyBuiltinCompiler builtinCompiler;
     private final Map<Long, String> cellIdToCellClass;
     private final Map<Long, Map<String, String>> globalDictIdToGlobalToClass;
     private final Set<String> builtinSet;
@@ -50,7 +56,12 @@ public class CDisCompiler {
         this.globalDictIdToGlobalToClass = new LinkedHashMap<>();
         this.classIdGenerator = 0;
         this.builtinSet = new LinkedHashSet<>();
+        this.builtinCompiler = new PyBuiltinCompiler(this);
         createBuiltins();
+    }
+
+    public void dumpClasses() {
+        classLoader.dumpClasses(Path.of("target", "cdis-generated-classes"));
     }
 
     public void createBuiltins() {
@@ -59,8 +70,11 @@ public class CDisCompiler {
             List<Consumer<CodeBuilder>> classInitializers = new ArrayList<>();
             for (var runtimeClass : runtimeClassList) {
                 if (runtimeClass.getAnnotation(PyBuiltin.class) != null) {
-                    // TODO
-                    // System.out.println("Found builtin class: " + runtimeClass.getName());
+                    var builtinName = runtimeClass.getAnnotation(PyBuiltin.class).value();
+                    classBuilder.withField(builtinName, CD.PY_OBJECT,
+                            Modifier.PUBLIC | Modifier.FINAL | Modifier.STATIC);
+                    builtinCompiler.compileType(classInitializers, runtimeClass);
+                    builtinSet.add(builtinName);
                 }
                 for (var field : runtimeClass.getDeclaredFields()) {
                     if (field.getAnnotation(PyBuiltin.class) != null) {
@@ -93,6 +107,22 @@ public class CDisCompiler {
 
     public void dumpClasses(Path dumpLocation) {
         classLoader.dumpClasses(dumpLocation);
+    }
+
+    public Class<?> loadClass(String className) {
+        try {
+            return classLoader.loadClass(className);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public String createClass(String classNameHint, BiConsumer<ClassDesc, ClassBuilder> classBuilderConsumer) {
+        var className = "io.github.cdisvm.codegen.builtins.builtin%s.%s".formatted(nextClassId(), classNameHint);
+        var classDesc = ClassDesc.of(className);
+        var bytecode = classFile.build(classDesc, cb -> classBuilderConsumer.accept(classDesc, cb));
+        classLoader.registerClass(className, bytecode);
+        return className;
     }
 
     public PyCallable compile(Bytecode bytecode) {
@@ -217,12 +247,29 @@ public class CDisCompiler {
 
             for (var parameter : signature.parameters()) {
                 classBuilder.withField(parameter.parameterName(), CD.PY_OBJECT, Modifier.PUBLIC);
+                if (parameter.defaultValue() != null) {
+                    classBuilder.withField(parameter.parameterName() + "$Default", CD.PY_OBJECT, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+                }
             }
 
             classBuilder.withField("$functionInstance", CD.PY_CALLABLE, Modifier.PRIVATE | Modifier.FINAL);
             classBuilder.withField("$argumentIndex", CD.INT, Modifier.PRIVATE);
 
-            classBuilder.withMethodBody("<init>", MethodTypeDesc.of(CD.VOID, CD.PY_CALLABLE), Modifier.PUBLIC, codeBuilder -> {
+            classBuilder.withMethodBody("<clinit>", MD.of(void.class), Modifier.PUBLIC | Modifier.STATIC, codeBuilder -> {
+                for (var parameter : signature.parameters()) {
+                    if (parameter.defaultValue() != null) {
+                        if (parameter.defaultValue() instanceof PyConstant constant) {
+                            constant.loadValueOntoStack(codeBuilder);
+                            codeBuilder.putstatic(callBuilderClassDesc, parameter.parameterName() + "$Default", CD.PY_OBJECT);
+                        } else {
+                            throw new UnsupportedOperationException();
+                        }
+                    }
+                }
+                codeBuilder.return_();
+            });
+
+            classBuilder.withMethodBody("<init>", MD.of(void.class, PyCallable.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(0);
                 codeBuilder.invokespecial(CD.OBJECT, "<init>", MethodTypeDesc.of(CD.VOID));
 
@@ -236,9 +283,9 @@ public class CDisCompiler {
 
                 for (var parameter : signature.parameters()) {
                     if (parameter.defaultValue() != null) {
-                        // TODO: Set the field to the default value
-                        //       which is stored in a static field after
-                        //       the class is created.
+                        codeBuilder.aload(0);
+                        codeBuilder.getstatic(callBuilderClassDesc, parameter.parameterName() + "$Default", CD.PY_OBJECT);
+                        codeBuilder.putfield(callBuilderClassDesc, parameter.parameterName(), CD.PY_OBJECT);
                     }
                 }
                 codeBuilder.return_();
@@ -586,9 +633,11 @@ public class CDisCompiler {
                 for (var parameter : bytecode.signature().parameters()) {
                     codeBuilder.aload(2);
                     codeBuilder.getfield(callBuilderClassDescriptor, parameter.parameterName(), CD.PY_OBJECT);
-                    codeBuilder.dup();
-                    codeBuilder.aconst_null();
-                    codeBuilder.if_acmpeq(invalidArgumentsLabel);
+                    if (!(parameter.defaultValue() instanceof PyDefault.NullConstant)) {
+                        codeBuilder.dup();
+                        codeBuilder.aconst_null();
+                        codeBuilder.if_acmpeq(invalidArgumentsLabel);
+                    }
                     var slot = compileRun.getVariableSlot(parameter.parameterName());
                     if (compileRun.isCell(parameter.parameterName())) {
                         codeBuilder.aload(slot);

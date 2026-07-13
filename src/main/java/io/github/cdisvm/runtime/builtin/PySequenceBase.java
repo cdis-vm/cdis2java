@@ -1,6 +1,5 @@
 package io.github.cdisvm.runtime.builtin;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -17,13 +16,12 @@ import io.github.cdisvm.runtime.PyIndexable;
 import io.github.cdisvm.runtime.PyIterable;
 import io.github.cdisvm.runtime.PyIterator;
 import io.github.cdisvm.runtime.PyObject;
-import io.github.cdisvm.runtime.PySettable;
 import io.github.cdisvm.runtime.PySizable;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.exception.PyIndexError;
 
 @NullMarked
-public class PySequenceBase<T extends PyObject> implements PyObject, PyGettable, PyContainer,
+public abstract class PySequenceBase<T extends PyObject> implements PyObject, PyGettable, PyContainer,
         PySizable, PyIterable, List<T> {
     final List<T> delegate;
 
