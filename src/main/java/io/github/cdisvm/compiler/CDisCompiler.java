@@ -35,6 +35,7 @@ import io.github.cdisvm.runtime.PyGlobal;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyDefault;
+import io.github.cdisvm.runtime.exception.PyBaseException;
 
 public class CDisCompiler {
 
@@ -655,18 +656,8 @@ public class CDisCompiler {
                 codeBuilder.athrow();
 
                 codeBuilder.labelBinding(codeStartLabel);
-                var lastSourceLine = -1;
-                for (var instruction : bytecode.instructions()) {
-                    var label = compileRun.bytecodeIndexToLabel().get(instruction.bytecodeIndex());
-                    if (label != null) {
-                        codeBuilder.labelBinding(label);
-                    }
-                    if (lastSourceLine != instruction.sourceLineNumber()) {
-                        lastSourceLine = instruction.sourceLineNumber();
-                        codeBuilder.lineNumber(lastSourceLine);
-                    }
-                    instruction.opcode().implement(codeBuilder, compileRun, bytecode.stackMetadataForInstruction().get(instruction.bytecodeIndex()));
-                }
+                implementInstructions(codeBuilder, compileRun, bytecode, -1, 0,
+                        bytecode.instructions().size());
             });
         });
         classLoader.registerClass(callableClass, classBytecode);
@@ -676,6 +667,46 @@ public class CDisCompiler {
         } catch (ClassNotFoundException | InvocationTargetException | InstantiationException | NoSuchMethodException |
                 IllegalAccessException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void implementInstructions(CodeBuilder codeBuilder, CompilationRun compileRun, Bytecode bytecode,
+            int lastSourceLine, int from, int to) {
+        for (var i = from; i < to; i++) {
+            var matchedExceptionHandler = false;
+            do {
+                matchedExceptionHandler = false;
+                for (var exceptionHandler : bytecode.exceptionHandlers()) {
+                    if (i != from && i == exceptionHandler.fromBytecodeIndex()) {
+                        var currentSourceLine = lastSourceLine;
+                        codeBuilder.trying(
+                                tryBlockCodeBuilder -> implementInstructions(tryBlockCodeBuilder,
+                                        compileRun, bytecode, currentSourceLine,
+                                        exceptionHandler.fromBytecodeIndex(), exceptionHandler.toBytecodeIndex()),
+                                catchBuilder -> {
+                                    catchBuilder.catching(CD.of(PyBaseException.class), catchBlockCodeBuilder -> {
+                                        catchBlockCodeBuilder.astore(compileRun.getLastRaisedExceptionSlot());
+                                        catchBlockCodeBuilder.aload(compileRun.getLastRaisedExceptionSlot());
+                                        catchBlockCodeBuilder.goto_(
+                                                compileRun.bytecodeIndexToLabel().get(exceptionHandler.handlerBytecodeIndex()));
+                                    });
+                                });
+                        i = exceptionHandler.toBytecodeIndex();
+                        matchedExceptionHandler = true;
+                        break;
+                    }
+                }
+            } while (matchedExceptionHandler);
+            var instruction = bytecode.instructions().get(i);
+            var label = compileRun.bytecodeIndexToLabel().get(instruction.bytecodeIndex());
+            if (label != null) {
+                codeBuilder.labelBinding(label);
+            }
+            if (lastSourceLine != instruction.sourceLineNumber()) {
+                lastSourceLine = instruction.sourceLineNumber();
+                codeBuilder.lineNumber(lastSourceLine);
+            }
+            instruction.opcode().implement(codeBuilder, compileRun, bytecode.stackMetadataForInstruction().get(instruction.bytecodeIndex()));
         }
     }
 }

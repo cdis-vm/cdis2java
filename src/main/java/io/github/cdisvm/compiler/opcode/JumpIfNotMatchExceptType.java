@@ -1,5 +1,14 @@
 package io.github.cdisvm.compiler.opcode;
 
+import java.lang.classfile.CodeBuilder;
+
+import io.github.cdisvm.compiler.CD;
+import io.github.cdisvm.compiler.CompilationRun;
+import io.github.cdisvm.compiler.MD;
+import io.github.cdisvm.compiler.StackMetadata;
+import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.PyType;
+
 /**
  * Top of stack is an exception type and the item below it is an exception.
  * <p>
@@ -34,5 +43,13 @@ public record JumpIfNotMatchExceptType(int targetBytecodeIndex) implements Opcod
     @Override
     public int getTargetBytecodeIndex() {
         return targetBytecodeIndex;
+    }
+
+    @Override
+    public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
+        codeBuilder.swap();
+        codeBuilder.invokeinterface(CD.of(PyType.class), "instanceCheck", MD.of(boolean.class, PyObject.class));
+        codeBuilder.loadConstant(1);
+        codeBuilder.ifeq(compilationRun.bytecodeIndexToLabel().get(targetBytecodeIndex));
     }
 }

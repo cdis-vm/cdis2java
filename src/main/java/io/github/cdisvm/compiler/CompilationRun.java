@@ -95,7 +95,11 @@ public record CompilationRun(CDisCompiler compiler,
         return syntheticStart + syntheticIndex;
     }
 
+    public int getLastRaisedExceptionSlot() {
+        return syntheticStart + syntheticCount;
+    }
+
     public int getWorkSlot(int workSlot) {
-        return syntheticStart + syntheticCount + workSlot;
+        return getLastRaisedExceptionSlot() + 1 + workSlot;
     }
 }
