@@ -29,9 +29,8 @@ public record RaiseWithCause() implements Opcode {
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
         codeBuilder.dup();
         codeBuilder.instanceOf(CD.of(PyType.class));
-        codeBuilder.loadConstant(0);
         var isCauseExceptionInstanceLabel = codeBuilder.newLabel();
-        codeBuilder.ifne(isCauseExceptionInstanceLabel);
+        codeBuilder.ifeq(isCauseExceptionInstanceLabel);
         codeBuilder.checkcast(CD.of(PyType.class));
         codeBuilder.invokeinterface(CD.PY_CALLABLE, "pyCallBuilder", MD.of(PyCallBuilder.class));
         codeBuilder.invokeinterface(CD.PY_CALL_BUILDER, "pyCall", MD.of(PyObject.class));
@@ -42,9 +41,8 @@ public record RaiseWithCause() implements Opcode {
 
         codeBuilder.dup();
         codeBuilder.instanceOf(CD.of(PyType.class));
-        codeBuilder.loadConstant(0);
         var isExceptionInstanceLabel = codeBuilder.newLabel();
-        codeBuilder.ifne(isExceptionInstanceLabel);
+        codeBuilder.ifeq(isExceptionInstanceLabel);
         codeBuilder.checkcast(CD.of(PyType.class));
         codeBuilder.invokeinterface(CD.PY_CALLABLE, "pyCallBuilder", MD.of(PyCallBuilder.class));
         codeBuilder.invokeinterface(CD.PY_CALL_BUILDER, "pyCall", MD.of(PyObject.class));

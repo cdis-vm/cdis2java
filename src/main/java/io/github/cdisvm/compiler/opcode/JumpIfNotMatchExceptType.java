@@ -49,7 +49,6 @@ public record JumpIfNotMatchExceptType(int targetBytecodeIndex) implements Opcod
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
         codeBuilder.swap();
         codeBuilder.invokeinterface(CD.of(PyType.class), "instanceCheck", MD.of(boolean.class, PyObject.class));
-        codeBuilder.loadConstant(1);
         codeBuilder.ifeq(compilationRun.bytecodeIndexToLabel().get(targetBytecodeIndex));
     }
 }

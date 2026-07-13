@@ -3,6 +3,8 @@ from cdis2java import compile_function, java_value, py_value
 def create_function_match_asserter(function):
     try:
         adapted = compile_function(function)
+        from cdis2java import compiler
+        compiler.dumpClasses()
     except Exception as e:
         e.printStackTrace()
         raise e

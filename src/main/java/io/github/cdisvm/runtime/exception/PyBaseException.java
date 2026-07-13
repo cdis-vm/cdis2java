@@ -2,19 +2,23 @@ package io.github.cdisvm.runtime.exception;
 
 import org.jspecify.annotations.Nullable;
 
+import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.annotation.PyVarArgs;
+import io.github.cdisvm.runtime.builtin.PyEmptyAttributes;
 import io.github.cdisvm.runtime.builtin.PyList;
 import io.github.cdisvm.runtime.builtin.PyStr;
 import io.github.cdisvm.runtime.builtin.PyTuple;
 
 @PyBuiltin("BaseException")
-public class PyBaseException extends RuntimeException {
+public class PyBaseException extends RuntimeException implements PyObject {
     public final PyTuple<PyObject> args;
     @Nullable
     public PyList<PyStr> __notes__;
+    public static PyType type;
 
     public PyBaseException() {
         super();
@@ -46,5 +50,15 @@ public class PyBaseException extends RuntimeException {
             __notes__ = new PyList<>();
         }
         __notes__.add(note);
+    }
+
+    @Override
+    public PyAttributes pyAttributes() {
+        return PyEmptyAttributes.INSTANCE;
+    }
+
+    @Override
+    public PyType pyType() {
+        return type;
     }
 }

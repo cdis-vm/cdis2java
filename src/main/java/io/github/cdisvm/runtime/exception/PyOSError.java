@@ -5,7 +5,7 @@ import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.annotation.PyDefault;
 import io.github.cdisvm.runtime.builtin.PyStr;
 
-@PyBuiltin("OSError")
+@PyBuiltin(value="OSError", aliases={"EnvironmentError", "IOError", "WindowsError"})
 public class PyOSError extends PyException {
     public PyOSError() {
         super();

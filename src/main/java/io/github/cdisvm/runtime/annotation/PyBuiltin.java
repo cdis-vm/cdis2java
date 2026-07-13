@@ -12,4 +12,5 @@ public @interface PyBuiltin {
      * The name of the builtin.
      */
     String value();
+    String[] aliases() default {};
 }

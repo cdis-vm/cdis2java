@@ -33,6 +33,7 @@ import io.github.cdisvm.runtime.PyCell;
 import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyGlobal;
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyDefault;
 import io.github.cdisvm.runtime.exception.PyBaseException;
@@ -58,6 +59,18 @@ public class CDisCompiler {
         createBuiltins();
     }
 
+    public PyType lookupType(String typeName) {
+        if (!builtinSet.contains(typeName)) {
+            throw new IllegalArgumentException();
+        }
+        try {
+            var builtinClass = classLoader.loadClass(CD.PY_BUILTINS_NAME);
+            return (PyType) builtinClass.getField(typeName).get(null);
+        } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public void dumpClasses() {
         classLoader.dumpClasses(Path.of("target", "cdis-generated-classes"));
     }
@@ -71,6 +84,11 @@ public class CDisCompiler {
                     var builtinName = runtimeClass.getAnnotation(PyBuiltin.class).value();
                     classBuilder.withField(builtinName, CD.PY_OBJECT,
                             Modifier.PUBLIC | Modifier.FINAL | Modifier.STATIC);
+                    for (var alias : runtimeClass.getAnnotation(PyBuiltin.class).aliases()) {
+                        classBuilder.withField(alias, CD.PY_OBJECT,
+                                Modifier.PUBLIC | Modifier.FINAL | Modifier.STATIC);
+                        builtinSet.add(alias);
+                    }
                     builtinCompiler.compileBuiltinType(classInitializers, runtimeClass);
                     builtinSet.add(builtinName);
                 }
@@ -656,7 +674,7 @@ public class CDisCompiler {
                 codeBuilder.athrow();
 
                 codeBuilder.labelBinding(codeStartLabel);
-                implementInstructions(codeBuilder, compileRun, bytecode, -1, 0,
+                implementInstructions(codeBuilder, compileRun, bytecode, -1, -1,0,
                         bytecode.instructions().size());
             });
         });
@@ -671,18 +689,19 @@ public class CDisCompiler {
     }
 
     private void implementInstructions(CodeBuilder codeBuilder, CompilationRun compileRun, Bytecode bytecode,
-            int lastSourceLine, int from, int to) {
+            int lastSourceLine, int lastTryStart, int from, int to) {
         for (var i = from; i < to; i++) {
             var matchedExceptionHandler = false;
             do {
                 matchedExceptionHandler = false;
                 for (var exceptionHandler : bytecode.exceptionHandlers()) {
-                    if (i != from && i == exceptionHandler.fromBytecodeIndex()) {
+                    if (i != lastTryStart && i == exceptionHandler.fromBytecodeIndex()) {
                         var currentSourceLine = lastSourceLine;
+                        var currentTryStart = i;
                         codeBuilder.trying(
                                 tryBlockCodeBuilder -> implementInstructions(tryBlockCodeBuilder,
                                         compileRun, bytecode, currentSourceLine,
-                                        exceptionHandler.fromBytecodeIndex(), exceptionHandler.toBytecodeIndex()),
+                                        currentTryStart, exceptionHandler.fromBytecodeIndex(), exceptionHandler.toBytecodeIndex()),
                                 catchBuilder -> {
                                     catchBuilder.catching(CD.of(PyBaseException.class), catchBlockCodeBuilder -> {
                                         catchBlockCodeBuilder.astore(compileRun.getLastRaisedExceptionSlot());

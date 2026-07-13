@@ -182,6 +182,10 @@ public class PyTypeCompiler {
         initializerList.add(codeBuilder -> {
             codeBuilder.getstatic(createdClassCD, "INSTANCE", createdClassCD);
             codeBuilder.putstatic(CD.PY_BUILTINS, builtinClass.getAnnotation(PyBuiltin.class).value(), CD.PY_OBJECT);
+            for (var alias : builtinClass.getAnnotation(PyBuiltin.class).aliases()) {
+                codeBuilder.getstatic(createdClassCD, "INSTANCE", createdClassCD);
+                codeBuilder.putstatic(CD.PY_BUILTINS, alias, CD.PY_OBJECT);
+            }
         });
         var loadedClass = cDisCompiler.loadClass(createdClass);
         try {

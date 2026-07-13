@@ -1,11 +1,11 @@
 import jpype
 import jpype.imports
-from jpype.types import *
 import inspect
 
 from cdis.compiler._api import to_bytecode
 import cdis.opcode as opcode
 
+compiler = None
 
 def start_jvm(jar_path):
     if not jpype.isJVMStarted():
@@ -19,6 +19,7 @@ def _jpackage(name):
     return jpype.JPackage(name)
 
 def _convert_py_constant(value):
+    global compiler
     from types import CellType
     if isinstance(value, bool):
         PyBool = _jclass("io.github.cdisvm.runtime.builtin.PyBool")
@@ -62,6 +63,8 @@ def _convert_py_constant(value):
         return java_type(*(_convert_py_constant(arg) for arg in value.args))
     if isinstance(value, CellType):
         return _convert_py_constant(value.cell_contents)
+    if isinstance(value, type):
+        return compiler.lookupType(value.__name__)
 
     raise ValueError(f"Unsupported constant type: {type(value)}")
 
@@ -404,11 +407,13 @@ def _convert_bytecode(bc):
 
 
 def compile_function(func, jar_path='target/cdis2java-999-SNAPSHOT.jar'):
+    global compiler
     start_jvm(jar_path)
+    JCDisCompiler = _jclass("io.github.cdisvm.compiler.CDisCompiler")
+    if compiler is None:
+        compiler = JCDisCompiler()
     py_bytecode = to_bytecode(func)
     java_bytecode = _convert_bytecode(py_bytecode)
-    JCDisCompiler = _jclass("io.github.cdisvm.compiler.CDisCompiler")
-    compiler = JCDisCompiler()
     return compiler.compile(java_bytecode)
 
 
