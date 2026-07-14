@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -674,7 +675,7 @@ public class CDisCompiler {
                 codeBuilder.athrow();
 
                 codeBuilder.labelBinding(codeStartLabel);
-                implementInstructions(codeBuilder, compileRun, bytecode, -1, -1,0,
+                implementInstructions(codeBuilder, compileRun, bytecode, -1, -1, 0,
                         bytecode.instructions().size());
             });
         });

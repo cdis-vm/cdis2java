@@ -8,6 +8,7 @@ import io.github.cdisvm.compiler.MD;
 import io.github.cdisvm.compiler.StackMetadata;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
+import io.github.cdisvm.runtime.exception.PyTypeError;
 
 /**
  * Top of stack is an exception type and the item below it is an exception.
@@ -47,6 +48,18 @@ public record JumpIfNotMatchExceptType(int targetBytecodeIndex) implements Opcod
 
     @Override
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
+        codeBuilder.dup();
+        codeBuilder.instanceOf(CD.of(PyType.class));
+        var isValidGuardLabel = codeBuilder.newLabel();
+        codeBuilder.ifne(isValidGuardLabel);
+        codeBuilder.new_(CD.of(PyTypeError.class));
+        codeBuilder.dup();
+        codeBuilder.loadConstant("catching classes that do not inherit from BaseException is not allowed");
+        codeBuilder.invokespecial(CD.of(PyTypeError.class), "<init>", MD.of(void.class, String.class));
+        codeBuilder.athrow();
+
+        codeBuilder.labelBinding(isValidGuardLabel);
+        codeBuilder.checkcast(CD.of(PyType.class));
         codeBuilder.swap();
         codeBuilder.invokeinterface(CD.of(PyType.class), "instanceCheck", MD.of(boolean.class, PyObject.class));
         codeBuilder.ifeq(compilationRun.bytecodeIndexToLabel().get(targetBytecodeIndex));
