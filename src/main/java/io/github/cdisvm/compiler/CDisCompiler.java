@@ -695,14 +695,15 @@ public class CDisCompiler {
             var matchedExceptionHandler = false;
             do {
                 matchedExceptionHandler = false;
+                var originalIndex = i;
                 for (var exceptionHandler : bytecode.exceptionHandlers()) {
-                    if (i != lastTryStart && i == exceptionHandler.fromBytecodeIndex()) {
+                    if (originalIndex != lastTryStart && originalIndex == exceptionHandler.fromBytecodeIndex()) {
                         var currentSourceLine = lastSourceLine;
-                        var currentTryStart = i;
+                        var currentInstructionStart = i;
                         codeBuilder.trying(
                                 tryBlockCodeBuilder -> implementInstructions(tryBlockCodeBuilder,
                                         compileRun, bytecode, currentSourceLine,
-                                        currentTryStart, exceptionHandler.fromBytecodeIndex(), exceptionHandler.toBytecodeIndex()),
+                                        originalIndex, currentInstructionStart, exceptionHandler.toBytecodeIndex()),
                                 catchBuilder -> {
                                     catchBuilder.catching(CD.of(PyBaseException.class), catchBlockCodeBuilder -> {
                                         catchBlockCodeBuilder.astore(compileRun.getLastRaisedExceptionSlot());
@@ -713,7 +714,6 @@ public class CDisCompiler {
                                 });
                         i = exceptionHandler.toBytecodeIndex();
                         matchedExceptionHandler = true;
-                        break;
                     }
                 }
             } while (matchedExceptionHandler);
