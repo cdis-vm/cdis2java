@@ -10,6 +10,11 @@ import io.github.cdisvm.runtime.builtin.PyStr;
 public class PyValueError extends PyException {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyValueError() {
         super();
     }

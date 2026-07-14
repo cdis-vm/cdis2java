@@ -10,6 +10,11 @@ import io.github.cdisvm.runtime.PyType;
 public class PyTabError extends PyIndentationError {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyTabError() {
         super();
     }

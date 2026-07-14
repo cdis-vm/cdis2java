@@ -10,6 +10,11 @@ import io.github.cdisvm.runtime.PyType;
 public class PyZeroDivisionError extends PyArithmeticError {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyZeroDivisionError() {
         super();
     }

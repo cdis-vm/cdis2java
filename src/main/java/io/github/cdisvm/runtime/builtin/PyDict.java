@@ -21,6 +21,11 @@ public record PyDict<Key_ extends PyObject, Value_ extends PyObject>(SequencedMa
         PyObject, PySizable, PyContainer, PyGettable, PySettable, SequencedMap<Key_, Value_> {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyDict() {
         this(new LinkedHashMap<>());
     }

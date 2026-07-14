@@ -10,6 +10,11 @@ import io.github.cdisvm.runtime.PyType;
 public class PyExceptionGroup extends PyBaseExceptionGroup {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyExceptionGroup(PyTuple<PyObject> args, PyBaseException exception, PyBaseExceptionGroup nested) {
         super(args, exception, nested);
     }

@@ -14,6 +14,11 @@ public record PyNone() implements PyConstant {
     public static final PyNone INSTANCE = new PyNone();
 
     @Override
+    public PyType pyType() {
+        return type;
+    }
+
+    @Override
     public void loadValueOntoStack(CodeBuilder codeBuilder) {
         codeBuilder.fieldAccess(Opcode.GETSTATIC, ClassDesc.of(PyNone.class.getCanonicalName()),
                 "INSTANCE", ClassDesc.of(PyNone.class.getCanonicalName()));

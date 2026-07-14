@@ -10,6 +10,11 @@ import io.github.cdisvm.runtime.PyType;
 public class PyChildProcessError extends PyOSError {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyChildProcessError() {
         super();
     }

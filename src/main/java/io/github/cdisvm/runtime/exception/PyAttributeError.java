@@ -10,6 +10,11 @@ import io.github.cdisvm.runtime.PyType;
 public class PyAttributeError extends PyException {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyAttributeError() {
         super();
     }

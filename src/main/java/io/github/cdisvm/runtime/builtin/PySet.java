@@ -16,6 +16,12 @@ import io.github.cdisvm.runtime.annotation.PyConstructor;
 public record PySet<Item_ extends PyObject>(SequencedSet<Item_> delegate) implements
         PyObject, PySizable, PyContainer, SequencedSet<Item_> {
     public static PyType type;
+
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PySet() {
         this(new LinkedHashSet<>());
     }

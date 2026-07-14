@@ -12,6 +12,11 @@ import io.github.cdisvm.runtime.PyType;
 public class PyException extends PyBaseException {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyException() {
         super();
     }

@@ -8,6 +8,11 @@ import io.github.cdisvm.runtime.PyType;
 public class PyGeneratorExit extends PyBaseException {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyGeneratorExit() {
         super();
     }

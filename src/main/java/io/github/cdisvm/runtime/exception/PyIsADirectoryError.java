@@ -10,6 +10,11 @@ import io.github.cdisvm.runtime.PyType;
 public class PyIsADirectoryError extends PyOSError {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyIsADirectoryError() {
         super();
     }

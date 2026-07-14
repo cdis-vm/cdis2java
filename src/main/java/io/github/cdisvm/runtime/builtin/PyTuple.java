@@ -11,6 +11,12 @@ import io.github.cdisvm.runtime.annotation.PyConstructor;
 @PyBuiltin("tuple")
 public class PyTuple<T extends PyObject> extends PySequenceBase<T> {
     public static PyType type;
+
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     private static final PyTuple<?> EMPTY = new PyTuple<>(Collections.emptyList());
 
     @PyConstructor

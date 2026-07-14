@@ -10,6 +10,11 @@ import io.github.cdisvm.runtime.PyType;
 public class PyIndexError extends PyLookupError {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyIndexError() {
         super();
     }

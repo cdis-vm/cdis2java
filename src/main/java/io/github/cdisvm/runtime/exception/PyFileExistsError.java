@@ -10,6 +10,11 @@ import io.github.cdisvm.runtime.PyType;
 public class PyFileExistsError extends PyOSError {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyFileExistsError() {
         super();
     }

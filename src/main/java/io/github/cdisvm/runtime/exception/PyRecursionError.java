@@ -10,6 +10,11 @@ import io.github.cdisvm.runtime.PyType;
 public class PyRecursionError extends PyRuntimeError {
     public static PyType type;
 
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyRecursionError() {
         super();
     }

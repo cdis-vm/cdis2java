@@ -14,6 +14,11 @@ public record PyNotImplemented() implements PyConstant {
     public static final PyNotImplemented INSTANCE = new PyNotImplemented();
 
     @Override
+    public PyType pyType() {
+        return type;
+    }
+
+    @Override
     public void loadValueOntoStack(CodeBuilder codeBuilder) {
         codeBuilder.fieldAccess(Opcode.GETSTATIC, ClassDesc.of(PyNotImplemented.class.getCanonicalName()),
                 "INSTANCE", ClassDesc.of(PyNotImplemented.class.getCanonicalName()));

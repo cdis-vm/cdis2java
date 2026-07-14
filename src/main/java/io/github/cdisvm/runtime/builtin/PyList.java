@@ -13,6 +13,12 @@ import io.github.cdisvm.runtime.exception.PyIndexError;
 @PyBuiltin("list")
 public class PyList<T extends PyObject> extends PySequenceBase<T> implements PySettable {
     public static PyType type;
+
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
     public PyList() {
         super();
     }
