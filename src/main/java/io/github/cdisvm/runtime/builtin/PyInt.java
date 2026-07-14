@@ -468,4 +468,13 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
         }
         return false;
     }
+
+    public int signum() {
+        if  (bigValue == null) {
+            return smallValue < 0 ?
+                    -1 : smallValue > 0 ?
+                         1 : 0;
+        }
+        return bigValue.signum();
+    }
 }

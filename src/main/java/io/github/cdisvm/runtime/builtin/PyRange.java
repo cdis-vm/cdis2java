@@ -2,6 +2,7 @@ package io.github.cdisvm.runtime.builtin;
 
 import java.util.Iterator;
 
+import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyDelegatingIterator;
 import io.github.cdisvm.runtime.PyIndexable;
 import io.github.cdisvm.runtime.PyIterable;
@@ -14,7 +15,7 @@ import io.github.cdisvm.runtime.annotation.PyDefault;
 import io.github.cdisvm.runtime.annotation.PyPosOnly;
 
 @PyBuiltin("range")
-public record PyRange(PyInt start, PyInt end, PyInt step) implements PyIterable {
+public record PyRange(PyInt start, PyInt end, PyInt step) implements PyObject, PyIterable {
     public static PyType type;
     @PyConstructor
     public static PyRange create(@PyPosOnly PyIndexable endOrStart,
@@ -29,12 +30,15 @@ public record PyRange(PyInt start, PyInt end, PyInt step) implements PyIterable 
 
     @Override
     public PyIterator pyIterator() {
+        var reversed = step.signum() < 0;
         return new PyDelegatingIterator(new Iterator<>() {
             PyInt current = start;
 
             @Override
             public boolean hasNext() {
-                return PyBool.TRUE == current.pyLessThan(end);
+                return reversed?
+                        PyBool.TRUE == current.pyGreaterThan(end) :
+                        PyBool.TRUE == current.pyLessThan(end);
             }
 
             @Override
@@ -44,5 +48,23 @@ public record PyRange(PyInt start, PyInt end, PyInt step) implements PyIterable 
                 return saved;
             }
         });
+    }
+
+    @Override
+    public PyAttributes pyAttributes() {
+        return PyEmptyAttributes.INSTANCE;
+    }
+
+    @Override
+    public PyType pyType() {
+        return type;
+    }
+
+    @Override
+    public PyBool pyTruth() {
+        var reversed = step.signum() < 0;
+        return (PyBool) (reversed?
+                start.pyGreaterThan(end) :
+                start.pyLessThan(end));
     }
 }

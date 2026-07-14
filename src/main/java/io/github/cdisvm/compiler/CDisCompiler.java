@@ -650,7 +650,7 @@ public class CDisCompiler {
                 for (var parameter : bytecode.signature().parameters()) {
                     codeBuilder.aload(2);
                     codeBuilder.getfield(callBuilderClassDescriptor, parameter.parameterName(), CD.PY_OBJECT);
-                    if (!(parameter.defaultValue() instanceof PyDefault.NullConstant)) {
+                    if (parameter.defaultValue() == null) {
                         codeBuilder.dup();
                         codeBuilder.aconst_null();
                         codeBuilder.if_acmpeq(invalidArgumentsLabel);
