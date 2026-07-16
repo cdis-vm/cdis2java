@@ -36,6 +36,7 @@ def _convert_class_info(cls: type, visited):
         class_attribute_to_type.put(cls_field, _convert_py_constant(object, visited))
         class_attribute_to_default.put(cls_field, _convert_py_constant(value, visited))
 
+    print('b')
     return JClassInfo(
         cls.__name__,
         cls.__qualname__,
@@ -98,9 +99,7 @@ def _convert_py_constant(value, visited=None):
         if out is not None:
             return out
         cls_info = _convert_class_info(value, visited)
-        print(cls_info)
         out = compiler.lookupUserType(cls_info)
-        print(out)
         return out
 
     raise ValueError(f"Unsupported constant type: {type(value)}")

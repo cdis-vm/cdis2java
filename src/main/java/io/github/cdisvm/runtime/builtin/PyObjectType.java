@@ -1,14 +1,19 @@
 package io.github.cdisvm.runtime.builtin;
 
+import java.lang.classfile.CodeBuilder;
 import java.util.List;
 
+import io.github.cdisvm.compiler.CD;
 import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyCallBuilder;
+import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
+import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.exception.PyValueError;
 
-public final class PyObjectType implements PyType {
+public final class PyObjectType implements PyType, PyConstant {
+    @PyBuiltin("object")
     public static PyObjectType INSTANCE = new PyObjectType();
 
     private final List<PyType> MRO;
@@ -75,5 +80,15 @@ public final class PyObjectType implements PyType {
     @Override
     public PyAttributes pyAttributes() {
         return PyEmptyAttributes.INSTANCE;
+    }
+
+    @Override
+    public void loadValueOntoStack(CodeBuilder codeBuilder) {
+        codeBuilder.getstatic(CD.of(PyObjectType.class), "INSTANCE", CD.of(PyObjectType.class));
+    }
+
+    @Override
+    public String getJavaIdentifierName() {
+        return "PyObjectType_INSTANCE";
     }
 }
