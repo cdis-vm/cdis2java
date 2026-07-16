@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -36,14 +35,13 @@ import io.github.cdisvm.runtime.PyGlobal;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
-import io.github.cdisvm.runtime.annotation.PyDefault;
 import io.github.cdisvm.runtime.exception.PyBaseException;
 
 public class CDisCompiler {
 
     private final ClassFile classFile;
     private final CDisClassLoader classLoader;
-    private final PyTypeCompiler builtinCompiler;
+    private final PyTypeCompiler typeCompiler;
     private final Map<Long, String> cellIdToCellClass;
     private final Map<Long, Map<String, String>> globalDictIdToGlobalToClass;
     private final Set<String> builtinSet;
@@ -56,13 +54,13 @@ public class CDisCompiler {
         this.globalDictIdToGlobalToClass = new LinkedHashMap<>();
         this.classIdGenerator = 0;
         this.builtinSet = new LinkedHashSet<>();
-        this.builtinCompiler = new PyTypeCompiler(this);
+        this.typeCompiler = new PyTypeCompiler(this);
         createBuiltins();
     }
 
-    public PyType lookupType(String typeName) {
+    public PyType lookupBuiltinType(String typeName) {
         if (!builtinSet.contains(typeName)) {
-            throw new IllegalArgumentException();
+            return null;
         }
         try {
             var builtinClass = classLoader.loadClass(CD.PY_BUILTINS_NAME);
@@ -70,6 +68,14 @@ public class CDisCompiler {
         } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public PyType lookupUserType(ClassInfo classInfo) {
+        return typeCompiler.compileUserType(classInfo);
+    }
+
+    public AttributeDesc getAttributeDesc(String attributeName) {
+        return typeCompiler.getAttributeDesc(attributeName);
     }
 
     public void dumpClasses() {
@@ -90,7 +96,7 @@ public class CDisCompiler {
                                 Modifier.PUBLIC | Modifier.FINAL | Modifier.STATIC);
                         builtinSet.add(alias);
                     }
-                    builtinCompiler.compileBuiltinType(classInitializers, runtimeClass);
+                    typeCompiler.compileBuiltinType(classInitializers, runtimeClass);
                     builtinSet.add(builtinName);
                 }
                 for (var field : runtimeClass.getDeclaredFields()) {

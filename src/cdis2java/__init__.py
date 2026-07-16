@@ -4,6 +4,7 @@ import inspect
 
 from cdis.compiler._api import to_bytecode
 import cdis.opcode as opcode
+from cdis.opcode import ClassInfo
 
 compiler = None
 
@@ -18,9 +19,38 @@ def _jclass(name):
 def _jpackage(name):
     return jpype.JPackage(name)
 
-def _convert_py_constant(value):
+def _convert_class_info(cls: type, visited):
+    if id(cls) in visited:
+        return None
+    visited.add(id(cls))
+    JClassInfo = _jclass("io.github.cdisvm.compiler.ClassInfo")
+    JHashMap = _jclass("java.util.HashMap")
+    class_attribute_to_type = JHashMap()
+    instance_attribute_to_type = JHashMap()
+    class_attribute_to_default = JHashMap()
+
+    for field, field_type in getattr(cls, '__annotations__', {}).items():
+        instance_attribute_to_type.put(field, _convert_py_constant(object, visited))
+
+    for cls_field, value in cls.__dict__.items():
+        class_attribute_to_type.put(cls_field, _convert_py_constant(object, visited))
+        class_attribute_to_default.put(cls_field, _convert_py_constant(value, visited))
+
+    return JClassInfo(
+        cls.__name__,
+        cls.__qualname__,
+        class_attribute_to_type,
+        instance_attribute_to_type,
+        class_attribute_to_default
+    )
+
+def _convert_py_constant(value, visited=None):
     global compiler
     from types import CellType
+
+    if visited is None:
+        visited = set()
+
     if isinstance(value, bool):
         PyBool = _jclass("io.github.cdisvm.runtime.builtin.PyBool")
         return PyBool.of(value)
@@ -37,34 +67,41 @@ def _convert_py_constant(value):
         PyList = _jclass("io.github.cdisvm.runtime.builtin.PyList")
         out = PyList()
         for item in value:
-            out.add(_convert_py_constant(item))
+            out.add(_convert_py_constant(item, visited))
         return out
     if isinstance(value, tuple):
         AList = _jclass("java.util.ArrayList")
         PyTuple = _jclass("io.github.cdisvm.runtime.builtin.PyTuple")
         out = AList()
         for item in value:
-            out.add(_convert_py_constant(item))
+            out.add(_convert_py_constant(item, visited))
         return PyTuple(out)
     if isinstance(value, dict):
         PyDict = _jclass("io.github.cdisvm.runtime.builtin.PyDict")
         out = PyDict()
         for key, item in value.items():
-            out.put(_convert_py_constant(key), _convert_py_constant(item))
+            out.put(_convert_py_constant(key, visited), _convert_py_constant(item, visited))
         return out
     if isinstance(value, set):
         PySet = _jclass("io.github.cdisvm.runtime.builtin.PySet")
         out = PySet()
         for item in value:
-            out.add(_convert_py_constant(item))
+            out.add(_convert_py_constant(item, visited))
         return out
     if isinstance(value, BaseException):
         java_type = _jclass(f"io.github.cdisvm.runtime.exception.Py{type(value).__name__}")
-        return java_type(*(_convert_py_constant(arg) for arg in value.args))
+        return java_type(*(_convert_py_constant(arg, visited) for arg in value.args))
     if isinstance(value, CellType):
-        return _convert_py_constant(value.cell_contents)
+        return _convert_py_constant(value.cell_contents, visited)
     if isinstance(value, type):
-        return compiler.lookupType(value.__name__)
+        out = compiler.lookupBuiltinType(value.__name__)
+        if out is not None:
+            return out
+        cls_info = _convert_class_info(value, visited)
+        print(cls_info)
+        out = compiler.lookupUserType(cls_info)
+        print(out)
+        return out
 
     raise ValueError(f"Unsupported constant type: {type(value)}")
 

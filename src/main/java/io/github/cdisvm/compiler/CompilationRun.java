@@ -83,6 +83,10 @@ public record CompilationRun(CDisCompiler compiler,
         return out;
     }
 
+    public AttributeDesc getAttributeDesc(String attributeName) {
+        return compiler.getAttributeDesc(attributeName);
+    }
+
     public boolean isCell(String variableName) {
         return cellVariableNameSet.contains(variableName);
     }

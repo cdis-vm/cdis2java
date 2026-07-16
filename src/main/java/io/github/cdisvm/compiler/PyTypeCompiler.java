@@ -1,6 +1,5 @@
 package io.github.cdisvm.compiler;
 
-import java.lang.classfile.ClassElement;
 import java.lang.classfile.CodeBuilder;
 import java.lang.constant.ClassDesc;
 import java.lang.reflect.Modifier;
@@ -30,11 +29,17 @@ public class PyTypeCompiler {
     private final CDisCompiler cDisCompiler;
     private final Map<Class<?>, PyType> classToCompiledType;
     private final Map<Class<?>, ClassDesc> classToMarkerInterfaceDesc;
+    private final Map<String, AttributeDesc> attributeNameToAttributeDesc;
+    private final Map<String, PyType> qualifiedNameToCompiledUserType;
+    private final Map<String, ClassDesc> qualifiedNameToMarkerInterfaceDesc;
 
     public PyTypeCompiler(CDisCompiler cDisCompiler) {
         this.cDisCompiler = cDisCompiler;
         classToCompiledType = new LinkedHashMap<>();
         classToMarkerInterfaceDesc = new LinkedHashMap<>();
+        attributeNameToAttributeDesc = new LinkedHashMap<>();
+        qualifiedNameToCompiledUserType = new LinkedHashMap<>();
+        qualifiedNameToMarkerInterfaceDesc = new LinkedHashMap<>();
     }
 
     private ClassDesc getMarkerInterfaceDesc(Class<?> sourceClass) {
@@ -52,6 +57,25 @@ public class PyTypeCompiler {
         var interfaceDesc = ClassDesc.of(interfaceName);
         classToMarkerInterfaceDesc.put(sourceClass, interfaceDesc);
         return interfaceDesc;
+    }
+
+    public AttributeDesc getAttributeDesc(String attributeName) {
+        if (attributeNameToAttributeDesc.containsKey(attributeName)) {
+            return attributeNameToAttributeDesc.get(attributeName);
+        }
+        var interfaceName = cDisCompiler.createClass("Has$%s".formatted(attributeName), (classDesc, classBuilder) -> {
+            var attrDesc = new AttributeDesc(classDesc, attributeName);
+            classBuilder.withFlags(Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE);
+            classBuilder.withMethod(attrDesc.getter(), MD.of(PyObject.class),
+                    Modifier.PUBLIC | Modifier.ABSTRACT, _ -> {});
+            classBuilder.withMethod(attrDesc.setter(), MD.of(void.class, PyObject.class),
+                    Modifier.PUBLIC | Modifier.ABSTRACT, _ -> {});
+            classBuilder.withMethod(attrDesc.delete(), MD.of(void.class),
+                    Modifier.PUBLIC | Modifier.ABSTRACT, _ -> {});
+        });
+        var attributeDesc = new AttributeDesc(ClassDesc.of(interfaceName), attributeName);
+        attributeNameToAttributeDesc.put(attributeName, attributeDesc);
+        return attributeDesc;
     }
 
     public PyType compileBuiltinType(List<Consumer<CodeBuilder>> initializerList, Class<?> builtinClass) {
@@ -196,5 +220,12 @@ public class PyTypeCompiler {
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public PyType compileUserType(ClassInfo classInfo) {
+        if (qualifiedNameToCompiledUserType.containsKey(classInfo.qualifiedName())) {
+            return qualifiedNameToCompiledUserType.get(classInfo.qualifiedName());
+        }
+        throw new UnsupportedOperationException(classInfo.classAttributeToDefaultValue().toString());
     }
 }
