@@ -24,6 +24,7 @@ import io.github.cdisvm.runtime.annotation.PyPosOnly;
 import io.github.cdisvm.runtime.annotation.PyVarArgs;
 import io.github.cdisvm.runtime.builtin.PyObjectType;
 import io.github.cdisvm.runtime.builtin.PyTypeType;
+import io.github.cdisvm.runtime.builtin.PyUserTypeCallBuilder;
 
 public class PyTypeCompiler {
     private final CDisCompiler cDisCompiler;
@@ -56,6 +57,20 @@ public class PyTypeCompiler {
         });
         var interfaceDesc = ClassDesc.of(interfaceName);
         classToMarkerInterfaceDesc.put(sourceClass, interfaceDesc);
+        return interfaceDesc;
+    }
+
+    private ClassDesc getMarkerInterfaceDesc(String qualifiedName) {
+        var sanitizedName = CDisCompiler.arbitraryTextToJavaIdentifierName(qualifiedName);
+        if (qualifiedNameToMarkerInterfaceDesc.containsKey(sanitizedName)) {
+            return qualifiedNameToMarkerInterfaceDesc.get(sanitizedName);
+        }
+        var interfaceName = cDisCompiler.createClass("%sMarker".formatted(sanitizedName), (classDesc, classBuilder) -> {
+            classBuilder.withFlags(Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE);
+            // TODO: Bases
+        });
+        var interfaceDesc = ClassDesc.of(interfaceName);
+        qualifiedNameToMarkerInterfaceDesc.put(qualifiedName, interfaceDesc);
         return interfaceDesc;
     }
 
@@ -226,6 +241,90 @@ public class PyTypeCompiler {
         if (qualifiedNameToCompiledUserType.containsKey(classInfo.qualifiedName())) {
             return qualifiedNameToCompiledUserType.get(classInfo.qualifiedName());
         }
-        throw new UnsupportedOperationException(classInfo.classAttributeToDefaultValue().toString());
+        var createdClass = cDisCompiler.createClass(classInfo.simpleName() + "Type", (classDesc, classBuilder) -> {
+            var markerInterfaceCD = getMarkerInterfaceDesc(classInfo.qualifiedName());
+            classBuilder.withInterfaceSymbols(CD.of(PyType.class), CD.of(PyObject.class), CD.of(PyCallable.class),
+                    markerInterfaceCD);
+            classBuilder.withField("INSTANCE", classDesc, Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+            classBuilder.withField("MRO", CD.of(List.class), Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
+
+            classBuilder.withMethodBody("<clinit>", MD.of(void.class), Modifier.PUBLIC | Modifier.STATIC, codeBuilder -> {
+                codeBuilder.new_(classDesc);
+                codeBuilder.dup();
+                codeBuilder.invokespecial(classDesc, "<init>", MD.of(void.class));
+                codeBuilder.putstatic(classDesc, "INSTANCE", classDesc);
+
+                codeBuilder.new_(CD.of(ArrayList.class));
+                codeBuilder.dup();
+                codeBuilder.invokespecial(CD.of(ArrayList.class), "<init>", MD.of(void.class));
+                codeBuilder.dup();
+                codeBuilder.getstatic(classDesc, "INSTANCE", classDesc);
+                codeBuilder.invokevirtual(CD.of(ArrayList.class), "add", MD.of(boolean.class, Object.class));
+                codeBuilder.pop();
+
+                codeBuilder.dup();
+                codeBuilder.getstatic(CD.of(PyObjectType.class), "INSTANCE", CD.of(PyObjectType.class));
+                codeBuilder.invokevirtual(CD.of(ArrayList.class), "add", MD.of(boolean.class, Object.class));
+                codeBuilder.pop();
+                // TODO: Bases
+                codeBuilder.putstatic(classDesc, "MRO", CD.of(List.class));
+                codeBuilder.return_();
+            });
+
+            classBuilder.withMethodBody("<init>", MD.of(void.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(0);
+                codeBuilder.invokespecial(CD.OBJECT, "<init>", MD.of(void.class));
+                codeBuilder.return_();
+            });
+
+            classBuilder.withMethodBody("pyCallBuilder", MD.of(PyCallBuilder.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.new_(CD.of(PyUserTypeCallBuilder.class));
+                codeBuilder.dup();
+                codeBuilder.new_(classDesc);
+                codeBuilder.dup();
+                codeBuilder.invokespecial(classDesc, "<init>", MD.of(void.class));
+                codeBuilder.invokespecial(CD.of(PyUserTypeCallBuilder.class), "<init>", MD.of(void.class, PyObject.class));
+                // TODO: Call __init__
+
+                codeBuilder.areturn();
+            });
+
+            classBuilder.withMethodBody("pyCall", MD.of(PyObject.class, PyCallBuilder.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(1);
+                codeBuilder.invokeinterface(CD.of(PyCallBuilder.class), "pyCall", MD.of(PyObject.class));
+                codeBuilder.areturn();
+            });
+
+            classBuilder.withMethodBody("mro", MD.of(List.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.getstatic(classDesc, "MRO", CD.of(List.class));
+                codeBuilder.areturn();
+            });
+
+            classBuilder.withMethodBody("pyType", MD.of(PyType.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.getstatic(CD.of(PyTypeType.class), "INSTANCE", CD.of(PyTypeType.class));
+                codeBuilder.areturn();
+            });
+
+            classBuilder.withMethodBody("instanceCheck", MD.of(boolean.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(1);
+                codeBuilder.invokeinterface(CD.PY_OBJECT, "pyType", MD.of(PyType.class));
+                codeBuilder.instanceOf(markerInterfaceCD);
+                codeBuilder.ireturn();
+            });
+
+            classBuilder.withMethodBody("subclassCheck", MD.of(boolean.class, PyType.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(1);
+                codeBuilder.instanceOf(markerInterfaceCD);
+                codeBuilder.ireturn();
+            });
+        });
+        var loadedClass = cDisCompiler.loadClass(createdClass);
+        try {
+            var compiledType = (PyType) loadedClass.getField("INSTANCE").get(null);
+            qualifiedNameToCompiledUserType.put(classInfo.qualifiedName(), compiledType);
+            return compiledType;
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

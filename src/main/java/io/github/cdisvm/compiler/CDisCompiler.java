@@ -169,7 +169,7 @@ public class CDisCompiler {
             return cellIdToCellClass.get(cellId);
         }
         if (value != null && !(value instanceof PyConstant)) {
-            throw new IllegalArgumentException("Cannot convert initial value to a constant.");
+            throw new IllegalArgumentException("Cannot convert initial value (%s) to a constant.".formatted(value));
         }
 
         var cellClass = PyCell.getClassName(cellId);

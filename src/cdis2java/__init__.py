@@ -33,6 +33,10 @@ def _convert_class_info(cls: type, visited):
         instance_attribute_to_type.put(field, _convert_py_constant(object, visited))
 
     for cls_field, value in cls.__dict__.items():
+        if cls_field.startswith('__') and cls_field.endswith('__'):
+            # Internal Python fields
+            # TODO: special case the ones that are public API like __add__
+            continue
         class_attribute_to_type.put(cls_field, _convert_py_constant(object, visited))
         class_attribute_to_default.put(cls_field, _convert_py_constant(value, visited))
 
