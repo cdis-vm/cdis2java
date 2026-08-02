@@ -22,6 +22,7 @@ public final class CD {
     public static final ClassDesc INT = ClassDesc.ofDescriptor("I");
     public static final ClassDesc LONG = ClassDesc.ofDescriptor("J");
     public static final ClassDesc BOOLEAN = ClassDesc.ofDescriptor("Z");
+    public static final ClassDesc DOUBLE = ClassDesc.ofDescriptor("D");
     public static final ClassDesc OBJECT = CD.of(Object.class);
     public static final ClassDesc LIST = CD.of(List.class);
     public static final ClassDesc PY_OBJECT = CD.of(PyObject.class);
@@ -52,6 +53,8 @@ public final class CD {
                 return INT;
             } else if (long.class.equals(clazz)) {
                 return LONG;
+            } else if (double.class.equals(clazz)) {
+                return DOUBLE;
             }
         }
         return ClassDesc.of(clazz.getCanonicalName());

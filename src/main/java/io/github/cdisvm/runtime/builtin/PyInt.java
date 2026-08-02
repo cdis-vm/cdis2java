@@ -12,6 +12,7 @@ import io.github.cdisvm.compiler.CD;
 import io.github.cdisvm.compiler.MD;
 import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyFormattable;
 import io.github.cdisvm.runtime.PyHasPos;
 import io.github.cdisvm.runtime.PyIndexable;
 import io.github.cdisvm.runtime.PyInvertible;
@@ -38,7 +39,9 @@ import io.github.cdisvm.runtime.comparison.PyHasGreaterThanOrEqual;
 import io.github.cdisvm.runtime.comparison.PyHasLessThan;
 import io.github.cdisvm.runtime.comparison.PyHasLessThanOrEqual;
 import io.github.cdisvm.runtime.comparison.PyHasNotEquals;
+import io.github.cdisvm.runtime.exception.PyValueError;
 import io.github.cdisvm.runtime.exception.PyZeroDivisionError;
+import io.github.cdisvm.runtime.util.DefaultFormatSpec;
 
 @NullMarked
 @PyBuiltin("int")
@@ -47,7 +50,7 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
         PyModuloAble, PyFloorDividable, PyLShiftable, PyRShiftable, PyPowAble, PyBitOrAble,
         PyBitAndAble, PyBitXorAble, PyHasPos, PyNegatable, PyInvertible,
         PyHasEquals, PyHasNotEquals, PyHasLessThan, PyHasLessThanOrEqual, PyHasGreaterThan,
-        PyHasGreaterThanOrEqual {
+        PyHasGreaterThanOrEqual, PyFormattable {
     public static PyType type;
     private static final int CACHE_START = -10;
     private static final int CACHE_END = 256;
@@ -87,6 +90,14 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
             return BigInteger.valueOf(smallValue);
         } else {
             return bigValue;
+        }
+    }
+
+    public PyFloat asFloat() {
+        if (bigValue == null) {
+            return new PyFloat(smallValue);
+        } else {
+            return new PyFloat(bigValue.doubleValue());
         }
     }
 
@@ -139,7 +150,7 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
 
     @Override
     public PyType pyType() {
-        return null;
+        return type;
     }
 
     @Override
@@ -476,5 +487,46 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
                          1 : 0;
         }
         return bigValue.signum();
+    }
+
+    @Override
+    public PyStr pyFormat(PyObject formatObj) {
+        if (formatObj == PyNone.INSTANCE) {
+            return pyString();
+        }
+        var specString = (PyStr) formatObj;
+        if (specString.value().isEmpty()) {
+            return pyString();
+        }
+
+        var formatSpec = DefaultFormatSpec.fromStringSpec(specString);
+        switch (formatSpec.conversionType.orElse(DefaultFormatSpec.ConversionType.DECIMAL)) {
+            case STRING, DECIMAL -> {
+                return pyString();
+            }
+            case BINARY -> {
+                if (bigValue == null) {
+                    return new PyStr(Long.toBinaryString(smallValue));
+                } else {
+                    return new PyStr(bigValue.toString(2));
+                }
+            }
+            case OCTAL -> {
+                if (bigValue == null) {
+                    return new PyStr(Long.toOctalString(smallValue));
+                } else {
+                    return new PyStr(bigValue.toString(8));
+                }
+            }
+            case LOWERCASE_HEX -> {
+                return new PyStr(hexString());
+            }
+            case UPPERCASE_HEX -> {
+                return new PyStr(hexString().toUpperCase());
+            }
+            default -> {
+                throw new PyValueError("Unsupported format specification: " + formatSpec);
+            }
+        }
     }
 }

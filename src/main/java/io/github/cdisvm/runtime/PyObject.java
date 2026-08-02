@@ -4,6 +4,7 @@ import java.util.IdentityHashMap;
 
 import io.github.cdisvm.runtime.builtin.PyBool;
 import io.github.cdisvm.runtime.builtin.PyDefaultAttributes;
+import io.github.cdisvm.runtime.builtin.PyStr;
 
 public interface PyObject {
     // TODO: actually implement this inside the class
@@ -17,5 +18,11 @@ public interface PyObject {
     }
     default PyBool pyTruth() {
         return PyBool.TRUE;
+    }
+    default PyStr pyString() {
+        return new PyStr(toString());
+    }
+    default PyStr pyRepr() {
+        return new PyStr(toString());
     }
 }

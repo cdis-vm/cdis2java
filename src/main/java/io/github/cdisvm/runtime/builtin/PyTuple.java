@@ -48,10 +48,11 @@ public class PyTuple<T extends PyObject> extends PySequenceBase<T> {
         var out = new StringBuilder();
         out.append('(');
         for (var item : delegate) {
-            out.append(item);
-            out.append(',');
+            out.append(item.pyRepr().value());
+            out.append(", ");
         }
         if (delegate.size() > 1) {
+            out.deleteCharAt(out.length() - 1);
             out.deleteCharAt(out.length() - 1);
         }
         out.append(')');
