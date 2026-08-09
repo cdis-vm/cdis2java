@@ -7,6 +7,7 @@ import java.util.SequencedMap;
 import java.util.Set;
 
 import io.github.cdisvm.runtime.PyContainer;
+import io.github.cdisvm.runtime.PyDeletable;
 import io.github.cdisvm.runtime.PyGettable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySettable;
@@ -18,7 +19,7 @@ import io.github.cdisvm.runtime.exception.PyKeyError;
 
 @PyBuiltin("dict")
 public record PyDict<Key_ extends PyObject, Value_ extends PyObject>(SequencedMap<Key_, Value_> delegate) implements
-        PyObject, PySizable, PyContainer, PyGettable, PySettable, SequencedMap<Key_, Value_> {
+        PyObject, PySizable, PyContainer, PyGettable, PySettable, PyDeletable, SequencedMap<Key_, Value_> {
     public static PyType type;
 
     @Override
@@ -58,6 +59,13 @@ public record PyDict<Key_ extends PyObject, Value_ extends PyObject>(SequencedMa
     @Override
     public void pySetItem(PyObject key, PyObject value) {
         delegate.put((Key_) key, (Value_) value);
+    }
+
+    @Override
+    public void pyDeleteItem(PyObject index) {
+        if (delegate.remove(index) == null) {
+            throw new PyKeyError(index.pyString().value());
+        }
     }
 
     @Override

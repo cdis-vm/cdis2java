@@ -2,7 +2,9 @@ package io.github.cdisvm.runtime.builtin;
 
 import java.util.List;
 
+import io.github.cdisvm.runtime.PyDeletable;
 import io.github.cdisvm.runtime.PyIndexable;
+import io.github.cdisvm.runtime.PyIterable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySettable;
 import io.github.cdisvm.runtime.PyType;
@@ -11,7 +13,7 @@ import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.exception.PyIndexError;
 
 @PyBuiltin("list")
-public class PyList<T extends PyObject> extends PySequenceBase<T> implements PySettable {
+public class PyList<T extends PyObject> extends PySequenceBase<T> implements PySettable, PyDeletable {
     public static PyType type;
 
     @Override
@@ -41,6 +43,10 @@ public class PyList<T extends PyObject> extends PySequenceBase<T> implements PyS
     @Override
     @SuppressWarnings("unchecked")
     public void pySetItem(PyObject key, PyObject value) {
+        if (key instanceof PySlice slice) {
+            replaceSlice(slice, (PyIterable) value);
+            return;
+        }
         var index = PyIndexable.wrapping(key).pyIndex().intValue();
         if (index < 0) {
             index = delegate.size() + index;
@@ -49,6 +55,25 @@ public class PyList<T extends PyObject> extends PySequenceBase<T> implements PyS
             throw new PyIndexError("Index: " + index + ", Size: " + delegate.size());
         }
         delegate.set(index, (T) value);
+    }
+
+    private void replaceSlice(PySlice slice, PyIterable iterable) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void pyDeleteItem(PyObject key) {
+        if (key instanceof PySlice slice) {
+            throw new UnsupportedOperationException();
+        }
+        var index = PyIndexable.wrapping(key).pyIndex().intValue();
+        if (index < 0) {
+            index = delegate.size() + index;
+        }
+        if (index < 0 || index >= delegate.size()) {
+            throw new PyIndexError("Index: " + index + ", Size: " + delegate.size());
+        }
+        delegate.remove(index);
     }
 
     @Override
