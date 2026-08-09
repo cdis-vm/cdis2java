@@ -19,6 +19,11 @@ public class PyList<T extends PyObject> extends PySequenceBase<T> implements PyS
         return type;
     }
 
+    @Override
+    PyObject createSlice(PySlice slice) {
+        return new PyList<>(slice.copySliceFromList(delegate));
+    }
+
     public PyList() {
         super();
     }

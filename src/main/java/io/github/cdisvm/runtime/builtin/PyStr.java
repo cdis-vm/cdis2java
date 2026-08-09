@@ -12,6 +12,8 @@ import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyContainer;
 import io.github.cdisvm.runtime.PyFormattable;
+import io.github.cdisvm.runtime.PyGettable;
+import io.github.cdisvm.runtime.PyIndexable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
@@ -23,7 +25,7 @@ import io.github.cdisvm.runtime.util.DefaultFormatSpec;
 
 @PyBuiltin("str")
 public record PyStr(String value) implements PyConstant, PyContainer, PyAddable, PyFormattable,
-        PyAsciiable {
+        PyAsciiable, PyGettable {
     public static PyType type;
 
     @PyConstructor
@@ -230,5 +232,17 @@ public record PyStr(String value) implements PyConstant, PyContainer, PyAddable,
                 .collect(StringBuilder::new,
                         StringBuilder::appendCodePoint, StringBuilder::append)
                 .toString());
+    }
+
+    @Override
+    public PyObject pyGetItem(PyObject item) {
+        if (item instanceof PySlice slice) {
+            return new PyStr(slice.copySliceFromString(value));
+        }
+        if (item instanceof PyIndexable indexable) {
+            var index = indexable.pyIndex().intValue();
+            return new PyStr(value.substring(index, index + 1));
+        }
+        throw new PyTypeError("Invalid index (%s)".formatted(item));
     }
 }

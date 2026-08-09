@@ -17,6 +17,11 @@ public class PyTuple<T extends PyObject> extends PySequenceBase<T> {
         return type;
     }
 
+    @Override
+    PyObject createSlice(PySlice slice) {
+        return new PyTuple<>(slice.copyImmutableSliceFromList(delegate));
+    }
+
     private static final PyTuple<?> EMPTY = new PyTuple<>(Collections.emptyList());
 
     @PyConstructor

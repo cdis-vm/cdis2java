@@ -170,16 +170,20 @@ public abstract class PySequenceBase<T extends PyObject> implements PyObject, Py
 
     @Override
     public PyObject pyGetItem(PyObject item) {
+        if (item instanceof PySlice slice) {
+            return createSlice(slice);
+        }
         var index = PyIndexable.wrapping(item).pyIndex().intValue();
         if (index < 0) {
             index = delegate.size() + index;
         }
         if (index < 0 || index >= delegate.size()) {
-            // TODO: Throw IndexError instead
             throw new PyIndexError("Index: " + index + ", Size: " + delegate.size());
         }
         return delegate.get(index);
     }
+
+    abstract PyObject createSlice(PySlice slice);
 
     @Override
     public PyInt pyLength() {
