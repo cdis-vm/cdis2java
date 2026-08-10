@@ -1,11 +1,16 @@
 package io.github.cdisvm.runtime.builtin;
 
+import java.lang.classfile.CodeBuilder;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.SequencedMap;
 import java.util.Set;
 
+import io.github.cdisvm.compiler.CD;
+import io.github.cdisvm.compiler.CDisCompiler;
+import io.github.cdisvm.compiler.MD;
+import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyContainer;
 import io.github.cdisvm.runtime.PyDeletable;
 import io.github.cdisvm.runtime.PyGettable;
@@ -19,7 +24,8 @@ import io.github.cdisvm.runtime.exception.PyKeyError;
 
 @PyBuiltin("dict")
 public record PyDict<Key_ extends PyObject, Value_ extends PyObject>(SequencedMap<Key_, Value_> delegate) implements
-        PyObject, PySizable, PyContainer, PyGettable, PySettable, PyDeletable, SequencedMap<Key_, Value_> {
+        PyObject, PySizable, PyContainer, PyGettable, PySettable, PyDeletable, SequencedMap<Key_, Value_>,
+        PyConstant {
     public static PyType type;
 
     @Override
@@ -35,6 +41,38 @@ public record PyDict<Key_ extends PyObject, Value_ extends PyObject>(SequencedMa
     public static PyDict<?, ?> create() {
         // TODO
         return new PyDict<>();
+    }
+
+    @Override
+    public void loadValueOntoStack(CodeBuilder codeBuilder) {
+        codeBuilder.new_(CD.PY_DICT);
+        codeBuilder.dup();
+
+        codeBuilder.new_(CD.of(LinkedHashMap.class));
+        codeBuilder.dup();
+        codeBuilder.invokespecial(CD.of(LinkedHashMap.class), "<init>", MD.of(void.class));
+
+        for (var entry : delegate.entrySet()) {
+            codeBuilder.dup();
+            if (entry.getKey() instanceof PyConstant key) {
+                key.loadValueOntoStack(codeBuilder);
+            } else {
+                throw new UnsupportedOperationException("Unsupported type: " + entry.getKey());
+            }
+            if (entry.getValue() instanceof PyConstant value) {
+                value.loadValueOntoStack(codeBuilder);
+            } else {
+                throw new UnsupportedOperationException("Unsupported type: " + entry.getKey());
+            }
+            codeBuilder.invokeinterface(CD.of(Map.class), "put", MD.of(Object.class, Object.class, Object.class));
+            codeBuilder.pop();
+        }
+        codeBuilder.invokespecial(CD.of(PyDict.class), "<init>", MD.of(void.class, SequencedMap.class));
+    }
+
+    @Override
+    public String getJavaIdentifierName() {
+        return "PyDict_" + CDisCompiler.arbitraryTextToJavaIdentifierName(delegate.toString());
     }
 
     public PyDict<Key_, Value_> pyPutAndReturnThis(PyObject key, PyObject value) {

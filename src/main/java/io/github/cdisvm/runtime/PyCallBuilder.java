@@ -11,6 +11,8 @@ public interface PyCallBuilder {
     PyObject pyCall();
 
     // These use $ since they can conflict with other interfaces otherwise
+    PyCallBuilder $bindTo(PyObject binding);
+    PyCallBuilder $returning(PyObject value);
     PyCallBuilder $appendArgument(PyObject argument);
     PyCallBuilder $putArgument(String argumentName, PyObject argument);
 

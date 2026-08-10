@@ -33,14 +33,9 @@ def _convert_class_info(cls: type, visited):
         instance_attribute_to_type.put(field, _convert_py_constant(object, visited))
 
     for cls_field, value in cls.__dict__.items():
-        if cls_field.startswith('__') and cls_field.endswith('__'):
-            # Internal Python fields
-            # TODO: special case the ones that are public API like __add__
-            continue
         class_attribute_to_type.put(cls_field, _convert_py_constant(object, visited))
         class_attribute_to_default.put(cls_field, _convert_py_constant(value, visited))
 
-    print('b')
     return JClassInfo(
         cls.__name__,
         cls.__qualname__,
@@ -51,7 +46,7 @@ def _convert_class_info(cls: type, visited):
 
 def _convert_py_constant(value, visited=None):
     global compiler
-    from types import CellType
+    from types import CellType, FunctionType
 
     if visited is None:
         visited = set()
@@ -97,7 +92,12 @@ def _convert_py_constant(value, visited=None):
         java_type = _jclass(f"io.github.cdisvm.runtime.exception.Py{type(value).__name__}")
         return java_type(*(_convert_py_constant(arg, visited) for arg in value.args))
     if isinstance(value, CellType):
-        return _convert_py_constant(value.cell_contents, visited)
+        try:
+            cell_contents = value.cell_contents
+        except ValueError:
+            # Cell is empty, so it has no initializer
+            return None
+        return _convert_py_constant(cell_contents, visited)
     if isinstance(value, type):
         out = compiler.lookupBuiltinType(value.__name__)
         if out is not None:
@@ -106,6 +106,11 @@ def _convert_py_constant(value, visited=None):
         out = compiler.lookupUserType(cls_info)
         return out
 
+    if isinstance(value, FunctionType):
+        return compile_function(value)
+
+    if is_defined_in_c(value):
+        return None
     raise ValueError(f"Unsupported constant type: {type(value)}")
 
 
@@ -421,10 +426,7 @@ def _convert_bytecode(bc):
 
     for key, value in bc.closure.items():
         # value is a cell
-        try:
-            closure.put(key, JCell(id(value), _convert_py_constant(value)))
-        except ValueError:
-            closure.put(key, JCell(id(value)))
+        closure.put(key, JCell(id(value), _convert_py_constant(value)))
 
     globals_map = _jclass("java.util.HashMap")()
     free_names = _py_set_to_java(bc.free_names)
@@ -471,6 +473,7 @@ def py_value(value):
     PyDict = _jclass("io.github.cdisvm.runtime.builtin.PyDict")
     PySet = _jclass("io.github.cdisvm.runtime.builtin.PySet")
     PyBaseException = _jclass("io.github.cdisvm.runtime.exception.PyBaseException")
+    PyType = _jclass("io.github.cdisvm.runtime.PyType")
 
     if isinstance(value, PyBool):
         return value.value()
@@ -493,5 +496,29 @@ def py_value(value):
         python_error_class_name = str(value.getClass().getSimpleName())[2:]
         python_error_class = getattr(builtins, python_error_class_name)
         return python_error_class(*py_value(value.args))
+    if isinstance(value, PyType):
+        class_name = str(value)
+        for builtin_type in (tuple, list, frozenset, set, dict, type(None), type(...),
+                             int, float, str, bool, type, object, range):
+            if str(builtin_type) == class_name:
+                return builtin_type
 
     raise ValueError(f"Unsupported constant type: {type(value)}")
+
+
+import inspect
+def is_defined_in_c(obj):
+    # Get the actual class of the object
+    obj_type = type(obj)
+
+    # 1. Check the module source
+    if obj_type.__module__ == 'builtins':
+        return True
+
+    # 2. Check if the code source file is available
+    try:
+        inspect.getfile(obj_type)
+        return False
+    except TypeError:
+        # C extensions and built-ins do not have a Python source file
+        return True

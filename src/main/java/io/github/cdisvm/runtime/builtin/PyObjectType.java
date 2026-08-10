@@ -56,6 +56,16 @@ public final class PyObjectType implements PyType, PyConstant {
             }
 
             @Override
+            public PyCallBuilder $bindTo(PyObject binding) {
+                throw new PyValueError("Too many arguments");
+            }
+
+            @Override
+            public PyCallBuilder $returning(PyObject value) {
+                throw new PyValueError("Impossible state");
+            }
+
+            @Override
             public PyCallBuilder $appendArgument(PyObject argument) {
                 throw new PyValueError("Too many arguments");
             }

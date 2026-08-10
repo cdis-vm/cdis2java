@@ -1,15 +1,22 @@
 package io.github.cdisvm.runtime.builtin;
 
+import java.lang.classfile.CodeBuilder;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
+import io.github.cdisvm.compiler.CD;
+import io.github.cdisvm.compiler.CDisCompiler;
+import io.github.cdisvm.compiler.MD;
+import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
 
 @PyBuiltin("tuple")
-public class PyTuple<T extends PyObject> extends PySequenceBase<T> {
+public class PyTuple<T extends PyObject> extends PySequenceBase<T> implements PyConstant {
     public static PyType type;
 
     @Override
@@ -36,6 +43,34 @@ public class PyTuple<T extends PyObject> extends PySequenceBase<T> {
 
     public PyTuple(List<T> delegate) {
         super(Collections.unmodifiableList(delegate));
+    }
+
+    @Override
+    public void loadValueOntoStack(CodeBuilder codeBuilder) {
+        codeBuilder.new_(CD.PY_TUPLE);
+        codeBuilder.dup();
+
+        codeBuilder.new_(CD.of(ArrayList.class));
+        codeBuilder.dup();
+        codeBuilder.invokespecial(CD.of(ArrayList.class), "<init>", MD.of(void.class));
+
+        for (var value : delegate) {
+            codeBuilder.dup();
+            if (value instanceof PyConstant constant) {
+                constant.loadValueOntoStack(codeBuilder);
+            } else {
+                throw new UnsupportedOperationException("Unsupported type: " + value);
+            }
+            codeBuilder.invokeinterface(CD.of(List.class), "add", MD.of(boolean.class, Object.class));
+            codeBuilder.pop();
+        }
+
+        codeBuilder.invokespecial(CD.PY_TUPLE, "<init>", MD.of(void.class, List.class));
+    }
+
+    @Override
+    public String getJavaIdentifierName() {
+        return "PyTuple_" + CDisCompiler.arbitraryTextToJavaIdentifierName(delegate.toString());
     }
 
     @SuppressWarnings("unchecked")

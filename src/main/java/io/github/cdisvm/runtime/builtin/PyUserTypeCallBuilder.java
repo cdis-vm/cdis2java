@@ -15,6 +15,16 @@ public class PyUserTypeCallBuilder implements PyCallBuilder {
     }
 
     @Override
+    public PyCallBuilder $bindTo(PyObject binding) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public PyCallBuilder $returning(PyObject value) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public PyCallBuilder $appendArgument(PyObject argument) {
         return this;
     }

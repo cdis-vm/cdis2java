@@ -7,16 +7,17 @@ import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.exception.PyAttributeError;
 
-public class PyDefaultAttributes implements PyAttributes {
+public class PyDefaultTypeAttributes implements PyAttributes {
     private Map<String, PyObject> attributeToValue;
 
-    public PyDefaultAttributes() {}
+    public PyDefaultTypeAttributes() {}
 
     @Override
     public PyObject getAttributeByName(String name) {
         if (attributeToValue == null) {
             throw new PyAttributeError("object does not have attribute '%s'".formatted(name));
         }
+        // TODO: descriptor protocol
         var out = attributeToValue.get(name);
         if (out == null) {
             throw new PyAttributeError("object does not have attribute '%s'".formatted(name));
@@ -29,6 +30,7 @@ public class PyDefaultAttributes implements PyAttributes {
         if (attributeToValue == null) {
             attributeToValue = new LinkedHashMap<>();
         }
+        // TODO: descriptor protocol
         attributeToValue.put(name, value);
     }
 
@@ -37,6 +39,7 @@ public class PyDefaultAttributes implements PyAttributes {
         if (attributeToValue == null) {
             return;
         }
+        // TODO: descriptor protocol
         attributeToValue.remove(name);
     }
 }

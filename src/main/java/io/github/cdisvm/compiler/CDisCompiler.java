@@ -6,7 +6,6 @@ import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.TypeKind;
 import java.lang.classfile.attribute.MethodParameterInfo;
 import java.lang.classfile.attribute.MethodParametersAttribute;
-import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.instruction.SwitchCase;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
@@ -28,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 
 import io.github.cdisvm.compiler.opcode.HasGlobal;
 import io.github.cdisvm.compiler.opcode.LoadConstant;
+import io.github.cdisvm.runtime.PyCallBuilder;
 import io.github.cdisvm.runtime.PyCallable;
 import io.github.cdisvm.runtime.PyCell;
 import io.github.cdisvm.runtime.PyConstant;
@@ -260,13 +260,10 @@ public class CDisCompiler {
         var callBuilderClassName = FunctionSignature.CALL_BUILDER_PACKAGE + nextClassId()  + "." + arbitraryTextToJavaIdentifierName(functionQualifiedName);
         var callBuilderClassDesc = ClassDesc.of(callBuilderClassName);
         var bytecode = classFile.build(callBuilderClassDesc, classBuilder -> {
-            var constantPool = classBuilder.constantPool();
-            var interfaces = new ArrayList<ClassEntry>();
-            interfaces.add(constantPool.classEntry(CD.PY_CALL_BUILDER));
-            for (var additionalInterface : additionalInterfaces) {
-                interfaces.add(constantPool.classEntry(additionalInterface));
-            }
-            classBuilder.withInterfaces(interfaces);
+            var interfaces = new ArrayList<ClassDesc>();
+            interfaces.add(CD.PY_CALL_BUILDER);
+            interfaces.addAll(additionalInterfaces);
+            classBuilder.withInterfaceSymbols(interfaces);
 
             for (var parameter : signature.parameters()) {
                 classBuilder.withField(parameter.parameterName(), CD.PY_OBJECT, Modifier.PUBLIC);
@@ -277,6 +274,8 @@ public class CDisCompiler {
 
             classBuilder.withField("$functionInstance", CD.PY_CALLABLE, Modifier.PRIVATE | Modifier.FINAL);
             classBuilder.withField("$argumentIndex", CD.INT, Modifier.PRIVATE);
+            classBuilder.withField("$binding", CD.PY_OBJECT, Modifier.PRIVATE);
+            classBuilder.withField("$returnValue", CD.PY_OBJECT, Modifier.PRIVATE);
 
             classBuilder.withMethodBody("<clinit>", MD.of(void.class), Modifier.PUBLIC | Modifier.STATIC, codeBuilder -> {
                 for (var parameter : signature.parameters()) {
@@ -303,6 +302,14 @@ public class CDisCompiler {
                 codeBuilder.aload(0);
                 codeBuilder.iconst_0();
                 codeBuilder.putfield(callBuilderClassDesc, "$argumentIndex", CD.INT);
+
+                codeBuilder.aload(0);
+                codeBuilder.aconst_null();
+                codeBuilder.putfield(callBuilderClassDesc, "$binding", CD.PY_OBJECT);
+
+                codeBuilder.aload(0);
+                codeBuilder.aconst_null();
+                codeBuilder.putfield(callBuilderClassDesc, "$returnValue", CD.PY_OBJECT);
 
                 for (var parameter : signature.parameters()) {
                     if (parameter.defaultValue() != null) {
@@ -337,6 +344,8 @@ public class CDisCompiler {
                     }
                 }
             }
+            implementCallBuilderBindTo(classBuilder, callBuilderClassDesc);
+            implementCallBuilderReturning(classBuilder, callBuilderClassDesc);
             implementCallBuilderAppend(classBuilder, callBuilderClassDesc, signature, vargsParameter);
             implementCallBuilderPut(classBuilder, callBuilderClassDesc, signature, kwargsParameter);
             implementCallBuilderCall(classBuilder, callBuilderClassDesc);
@@ -345,8 +354,50 @@ public class CDisCompiler {
         return callBuilderClassDesc;
     }
 
+    private void implementCallBuilderBindTo(ClassBuilder classBuilder, ClassDesc callBuilderClassDesc) {
+        classBuilder.withMethodBody("$bindTo", MD.of(PyCallBuilder.class, PyObject.class), Modifier.PUBLIC,
+                codeBuilder -> {
+                    codeBuilder.aload(0);
+                    codeBuilder.aload(1);
+                    codeBuilder.putfield(callBuilderClassDesc, "$binding", CD.PY_OBJECT);
+
+                    codeBuilder.aload(0);
+                    codeBuilder.aload(1);
+                    codeBuilder.invokevirtual(callBuilderClassDesc, "$appendArgument",
+                            MD.of(PyCallBuilder.class, PyObject.class));
+
+                    codeBuilder.aload(0);
+                    codeBuilder.areturn();
+                });
+    }
+
+    private void implementCallBuilderReturning(ClassBuilder classBuilder, ClassDesc callBuilderClassDesc) {
+        classBuilder.withMethodBody("$returning", MD.of(PyCallBuilder.class, PyObject.class), Modifier.PUBLIC,
+                codeBuilder -> {
+                    codeBuilder.aload(0);
+                    codeBuilder.aload(1);
+                    codeBuilder.putfield(callBuilderClassDesc, "$returnValue", CD.PY_OBJECT);
+
+                    codeBuilder.aload(0);
+                    codeBuilder.areturn();
+                });
+    }
+
     private void implementCallBuilderPositionalArgument(ClassBuilder classBuilder, ClassDesc callBuilderClassDesc, FunctionParameter parameter) {
         classBuilder.withMethodBody("$" + parameter.parameterIndex(), MethodTypeDesc.of(CD.PY_CALL_BUILDER, CD.PY_OBJECT), Modifier.PUBLIC, codeBuilder -> {
+            codeBuilder.aload(0);
+            codeBuilder.getfield(callBuilderClassDesc, "$binding", CD.PY_OBJECT);
+            var hasNoBinding = codeBuilder.newLabel();
+            codeBuilder.aconst_null();
+            codeBuilder.if_acmpne(hasNoBinding);
+
+            codeBuilder.aload(0);
+            codeBuilder.aload(1);
+            codeBuilder.invokevirtual(callBuilderClassDesc, "$appendArgument",
+                    MD.of(PyCallBuilder.class, PyObject.class));
+            codeBuilder.areturn();
+
+            codeBuilder.labelBinding(hasNoBinding);
             codeBuilder.aload(0);
             codeBuilder.aload(1);
             codeBuilder.putfield(callBuilderClassDesc, parameter.parameterName(), CD.PY_OBJECT);
@@ -380,6 +431,20 @@ public class CDisCompiler {
             codeBuilder.getfield(callBuilderClassDesc, "$functionInstance", CD.PY_CALLABLE);
             codeBuilder.aload(0);
             codeBuilder.invokeinterface(CD.PY_CALLABLE, "pyCall", MethodTypeDesc.of(CD.PY_OBJECT, CD.PY_CALL_BUILDER));
+
+            codeBuilder.aload(0);
+            codeBuilder.getfield(callBuilderClassDesc, "$returnValue", CD.PY_OBJECT);;
+            codeBuilder.dup();
+            codeBuilder.aconst_null();
+            var hasNoReturnOverride = codeBuilder.newLabel();
+
+            codeBuilder.if_acmpeq(hasNoReturnOverride);
+            codeBuilder.swap();
+            codeBuilder.pop();
+            codeBuilder.areturn();
+
+            codeBuilder.labelBinding(hasNoReturnOverride);
+            codeBuilder.pop();
             codeBuilder.return_(TypeKind.REFERENCE);
         });
     }
@@ -584,8 +649,7 @@ public class CDisCompiler {
         var callableClass = FunctionSignature.CALLABLE_PACKAGE + nextClassId() + "." + bytecode.functionName();
         var callableClassDescriptor = ClassDesc.of(callableClass);
         var classBytecode = classFile.build(callableClassDescriptor, classBuilder -> {
-            var constantPool = classBuilder.constantPool();
-            classBuilder.withInterfaces(constantPool.classEntry(CD.PY_CALLABLE));
+            classBuilder.withInterfaceSymbols(CD.PY_CALLABLE, CD.of(PyConstant.class));
 
             Map<String, PyConstant> constantMap = new LinkedHashMap<>();
             Map<String, PyGlobal> globalMap = new LinkedHashMap<>();
@@ -617,6 +681,37 @@ public class CDisCompiler {
                 codeBuilder.aload(0);
                 codeBuilder.invokespecial(CD.OBJECT, "<init>", MethodTypeDesc.of(CD.VOID));
                 codeBuilder.return_();
+            });
+
+            classBuilder.withMethodBody("loadValueOntoStack", MD.of(void.class, CodeBuilder.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(1);
+
+                codeBuilder.loadConstant(callableClass);
+                codeBuilder.invokestatic(CD.of(ClassDesc.class), "of", MD.of(ClassDesc.class, String.class),
+                        true);
+                codeBuilder.astore(2);
+
+                codeBuilder.aload(2);
+                codeBuilder.invokeinterface(CD.of(CodeBuilder.class), "new_", MD.of(CodeBuilder.class, ClassDesc.class));
+                codeBuilder.invokeinterface(CD.of(CodeBuilder.class), "dup", MD.of(CodeBuilder.class));
+
+                codeBuilder.aload(2);
+                codeBuilder.loadConstant("<init>");
+
+                codeBuilder.loadConstant("V");
+                codeBuilder.invokestatic(CD.of(ClassDesc.class), "ofDescriptor", MD.of(ClassDesc.class, String.class),
+                        true);
+                codeBuilder.invokestatic(CD.of(MethodTypeDesc.class), "of", MD.of(MethodTypeDesc.class, ClassDesc.class),
+                        true);
+
+                codeBuilder.invokeinterface(CD.of(CodeBuilder.class), "invokespecial",
+                        MD.of(CodeBuilder.class, ClassDesc.class, String.class, MethodTypeDesc.class));
+                codeBuilder.return_();
+            });
+
+            classBuilder.withMethodBody("getJavaIdentifierName", MD.of(String.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.loadConstant("PyCallable_" + arbitraryTextToJavaIdentifierName(callableClass));
+                codeBuilder.areturn();
             });
 
             classBuilder.withMethodBody("pyCallBuilder", MethodTypeDesc.of(CD.PY_CALL_BUILDER), Modifier.PUBLIC, codeBuilder -> {
