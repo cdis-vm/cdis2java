@@ -44,6 +44,9 @@ public final class CD {
     private CD() {}
 
     public static ClassDesc of(Class<?> clazz) {
+        if (clazz.isArray()) {
+            return of(clazz.getComponentType()).arrayType();
+        }
         if (clazz.isPrimitive()) {
             if (void.class.equals(clazz)) {
                 return VOID;

@@ -321,6 +321,64 @@ public class CDisCompiler {
                 codeBuilder.return_();
             });
 
+            classBuilder.withMethodBody("<init>", MD.of(void.class, PyCallable.class, PyObject[].class, int[].class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(0);
+                codeBuilder.invokespecial(CD.OBJECT, "<init>", MethodTypeDesc.of(CD.VOID));
+
+                codeBuilder.aload(0);
+                codeBuilder.aload(1);
+                codeBuilder.putfield(callBuilderClassDesc, "$functionInstance", CD.PY_CALLABLE);
+
+                codeBuilder.aload(0);
+                codeBuilder.iconst_0();
+                codeBuilder.putfield(callBuilderClassDesc, "$argumentIndex", CD.INT);
+
+                codeBuilder.aload(0);
+                codeBuilder.aconst_null();
+                codeBuilder.putfield(callBuilderClassDesc, "$binding", CD.PY_OBJECT);
+
+                codeBuilder.aload(0);
+                codeBuilder.aconst_null();
+                codeBuilder.putfield(callBuilderClassDesc, "$returnValue", CD.PY_OBJECT);
+
+                var arrayLengthSlot = 4;
+                var iterationIndexSlot = 5;
+
+                codeBuilder.aload(2);
+                codeBuilder.arraylength();
+                codeBuilder.istore(arrayLengthSlot);
+                codeBuilder.loadConstant(0);
+                codeBuilder.istore(iterationIndexSlot);
+
+                var done = codeBuilder.newLabel();
+                codeBuilder.iload(arrayLengthSlot);
+                codeBuilder.iload(iterationIndexSlot);
+                codeBuilder.if_icmpeq(done);
+                for (var parameter : signature.parameters()) {
+                    var next = codeBuilder.newLabel();
+                    codeBuilder.aload(3);
+                    codeBuilder.iload(iterationIndexSlot);
+                    codeBuilder.iaload();
+                    codeBuilder.loadConstant(parameter.parameterIndex());
+
+                    codeBuilder.if_icmpne(next);
+
+                    codeBuilder.aload(0);
+                    codeBuilder.aload(2);
+                    codeBuilder.iload(iterationIndexSlot);
+                    codeBuilder.aaload();
+                    codeBuilder.putfield(callBuilderClassDesc, parameter.parameterName(), CD.PY_OBJECT);
+                    codeBuilder.iinc(iterationIndexSlot, 1);
+                    codeBuilder.iload(arrayLengthSlot);
+                    codeBuilder.iload(iterationIndexSlot);
+                    codeBuilder.if_icmpeq(done);
+
+                    codeBuilder.labelBinding(next);
+                }
+                codeBuilder.labelBinding(done);
+                codeBuilder.return_();
+            });
+
             FunctionParameter vargsParameter = null;
             FunctionParameter kwargsParameter = null;
 
@@ -668,7 +726,7 @@ public class CDisCompiler {
                     classBuilder.withField(constantEntry.getKey(), CD.of(constantEntry.getValue().getClass()), Modifier.PRIVATE | Modifier.FINAL | Modifier.STATIC);
                 }
 
-                classBuilder.withMethodBody("<clinit>", MethodTypeDesc.of(CD.VOID), Modifier.PUBLIC | Modifier.STATIC, codeBuilder -> {
+                classBuilder.withMethodBody("<clinit>", MD.of(void.class), Modifier.PUBLIC | Modifier.STATIC, codeBuilder -> {
                     for (var constantEntry : constantMap.entrySet()) {
                         constantEntry.getValue().loadValueOntoStack(codeBuilder);
                         codeBuilder.putstatic(callableClassDescriptor, constantEntry.getKey(), ClassDesc.of(constantEntry.getValue().getClass().getCanonicalName()));
@@ -681,16 +739,26 @@ public class CDisCompiler {
                 classBuilder.withField(freeName, CD.PY_CELL, Modifier.PRIVATE);
             }
 
-            classBuilder.withMethodBody("<init>", MethodTypeDesc.of(CD.VOID), Modifier.PUBLIC, codeBuilder -> {
+            classBuilder.withField("$default", CD.PY_OBJECT.arrayType(), Modifier.PRIVATE);
+            classBuilder.withField("$defaultIndices", CD.INT.arrayType(), Modifier.PRIVATE);
+
+            classBuilder.withMethodBody("<init>", MD.of(void.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(0);
-                codeBuilder.invokespecial(CD.OBJECT, "<init>", MethodTypeDesc.of(CD.VOID));
+                codeBuilder.invokespecial(CD.OBJECT, "<init>", MD.of(void.class));
                 for (var freeName : bytecode.freeNames()) {
                     codeBuilder.aload(0);
                     codeBuilder.new_(CD.PY_CELL);
                     codeBuilder.dup();
-                    codeBuilder.invokespecial(CD.PY_CELL, "<init>", MethodTypeDesc.of(CD.VOID));
+                    codeBuilder.invokespecial(CD.PY_CELL, "<init>", MD.of(void.class));
                     codeBuilder.putfield(callableClassDescriptor, freeName, CD.PY_CELL);
                 }
+                codeBuilder.aload(0);
+                codeBuilder.aconst_null();
+                codeBuilder.putfield(callableClassDescriptor, "$default", CD.PY_OBJECT.arrayType());
+
+                codeBuilder.aload(0);
+                codeBuilder.aconst_null();
+                codeBuilder.putfield(callableClassDescriptor, "$defaultIndices", CD.INT.arrayType());
                 codeBuilder.return_();
             });
 
@@ -726,10 +794,30 @@ public class CDisCompiler {
             });
 
             classBuilder.withMethodBody("pyCallBuilder", MethodTypeDesc.of(CD.PY_CALL_BUILDER), Modifier.PUBLIC, codeBuilder -> {
+                var overrideDefaults = codeBuilder.newLabel();
+                codeBuilder.aload(0);
+                codeBuilder.getfield(callableClassDescriptor, "$default", CD.PY_OBJECT.arrayType());
+                codeBuilder.aconst_null();
+                codeBuilder.if_acmpne(overrideDefaults);
+
                 codeBuilder.new_(callBuilderClassDescriptor);
                 codeBuilder.dup();
                 codeBuilder.aload(0);
-                codeBuilder.invokespecial(callBuilderClassDescriptor, "<init>", MethodTypeDesc.of(CD.VOID, CD.PY_CALLABLE));
+                codeBuilder.invokespecial(callBuilderClassDescriptor, "<init>", MD.of(void.class, PyCallable.class));
+                codeBuilder.return_(TypeKind.REFERENCE);
+
+                codeBuilder.labelBinding(overrideDefaults);
+                codeBuilder.new_(callBuilderClassDescriptor);
+                codeBuilder.dup();
+                codeBuilder.aload(0);
+
+                codeBuilder.aload(0);
+                codeBuilder.getfield(callableClassDescriptor, "$default", CD.PY_OBJECT.arrayType());
+
+                codeBuilder.aload(0);
+                codeBuilder.getfield(callableClassDescriptor, "$defaultIndices", CD.INT.arrayType());
+
+                codeBuilder.invokespecial(callBuilderClassDescriptor, "<init>", MD.of(void.class, PyCallable.class, PyObject[].class, int[].class));
                 codeBuilder.return_(TypeKind.REFERENCE);
             });
 
@@ -742,6 +830,19 @@ public class CDisCompiler {
                             codeBuilder.return_();
                         });
             }
+
+            classBuilder.withMethodBody("set$Default", MD.of(void.class, PyObject[].class, int[].class),
+                    Modifier.PUBLIC,  codeBuilder -> {
+                        codeBuilder.aload(0);
+                        codeBuilder.aload(1);
+                        codeBuilder.putfield(callableClassDescriptor, "$default", CD.PY_OBJECT.arrayType());
+
+                        codeBuilder.aload(0);
+                        codeBuilder.aload(2);
+                        codeBuilder.putfield(callableClassDescriptor, "$defaultIndices", CD.INT.arrayType());
+
+                        codeBuilder.return_();
+                    });
 
             classBuilder.withMethodBody("pyCall", MethodTypeDesc.of(CD.PY_OBJECT, CD.PY_CALL_BUILDER), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(1);

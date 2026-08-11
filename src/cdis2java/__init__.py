@@ -286,7 +286,8 @@ def _convert_opcode(op):
         return O.CallWithBuilder()
     if isinstance(op, opcode.LoadAndBindInnerFunction):
         inner_bc = _convert_bytecode(op.inner_function.bytecode)
-        return O.LoadAndBindInnerFunction(inner_bc)
+        parameters_with_defaults = _py_list_to_java(op.inner_function.parameters_with_defaults)
+        return O.LoadAndBindInnerFunction(inner_bc, parameters_with_defaults)
     if isinstance(op, opcode.LoadAndBindInnerClass):
         class_body_bc = _convert_bytecode(op.class_body)
         return O.LoadAndBindInnerClass(op.class_name, class_body_bc)
