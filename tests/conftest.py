@@ -29,6 +29,7 @@ def create_function_match_asserter(function):
         try:
             out = py_value(adapted.pyCall(call_builder))
         except Exception as java_exception:
+            java_exception.printStackTrace()
             py_error = None
             try:
                 function(*args, **kwargs)

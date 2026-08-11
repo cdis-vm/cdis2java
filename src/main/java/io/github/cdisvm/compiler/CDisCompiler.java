@@ -677,9 +677,20 @@ public class CDisCompiler {
                 });
             }
 
+            for (var freeName : bytecode.freeNames()) {
+                classBuilder.withField(freeName, CD.PY_CELL, Modifier.PRIVATE);
+            }
+
             classBuilder.withMethodBody("<init>", MethodTypeDesc.of(CD.VOID), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(0);
                 codeBuilder.invokespecial(CD.OBJECT, "<init>", MethodTypeDesc.of(CD.VOID));
+                for (var freeName : bytecode.freeNames()) {
+                    codeBuilder.aload(0);
+                    codeBuilder.new_(CD.PY_CELL);
+                    codeBuilder.dup();
+                    codeBuilder.invokespecial(CD.PY_CELL, "<init>", MethodTypeDesc.of(CD.VOID));
+                    codeBuilder.putfield(callableClassDescriptor, freeName, CD.PY_CELL);
+                }
                 codeBuilder.return_();
             });
 
@@ -722,6 +733,16 @@ public class CDisCompiler {
                 codeBuilder.return_(TypeKind.REFERENCE);
             });
 
+            for (var freeName : bytecode.freeNames()) {
+                classBuilder.withMethodBody("$" + freeName, MD.of(void.class, PyCell.class),
+                        Modifier.PUBLIC,  codeBuilder -> {
+                            codeBuilder.aload(0);
+                            codeBuilder.aload(1);
+                            codeBuilder.putfield(callableClassDescriptor, freeName, CD.PY_CELL);
+                            codeBuilder.return_();
+                        });
+            }
+
             classBuilder.withMethodBody("pyCall", MethodTypeDesc.of(CD.PY_OBJECT, CD.PY_CALL_BUILDER), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(1);
                 codeBuilder.checkcast(callBuilderClassDescriptor);
@@ -732,13 +753,21 @@ public class CDisCompiler {
                 var invalidArgumentsLabel = codeBuilder.newLabel();
 
                 for (var variableEntry : compileRun.variableNameToSlot().entrySet()) {
+                    codeBuilder.localVariable(variableEntry.getValue(), variableEntry.getKey(),
+                            CD.PY_OBJECT, codeBuilder.startLabel(), codeBuilder.endLabel());
                     if (compileRun.isCell(variableEntry.getKey())) {
                         var slot = compileRun.getVariableSlot(variableEntry.getKey());
                         if (!bytecode.closure().containsKey(variableEntry.getKey())) {
-                            codeBuilder.new_(CD.PY_CELL);
-                            codeBuilder.dup();
-                            codeBuilder.invokespecial(CD.PY_CELL, "<init>", MethodTypeDesc.of(CD.VOID));
-                            codeBuilder.astore(slot);
+                            if (bytecode.freeNames().contains(variableEntry.getKey())) {
+                                codeBuilder.aload(0);
+                                codeBuilder.getfield(callableClassDescriptor, variableEntry.getKey(), CD.PY_CELL);
+                                codeBuilder.astore(slot);
+                            } else {
+                                codeBuilder.new_(CD.PY_CELL);
+                                codeBuilder.dup();
+                                codeBuilder.invokespecial(CD.PY_CELL, "<init>", MethodTypeDesc.of(CD.VOID));
+                                codeBuilder.astore(slot);
+                            }
                         } else {
                             var cell = bytecode.closure().get(variableEntry.getKey());
                             var cellClass = createCellClass(cell.getCellId(), cell.getValue());
