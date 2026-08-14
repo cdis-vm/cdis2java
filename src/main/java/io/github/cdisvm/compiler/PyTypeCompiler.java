@@ -27,10 +27,14 @@ import io.github.cdisvm.runtime.annotation.PyKwArgs;
 import io.github.cdisvm.runtime.annotation.PyKwOnly;
 import io.github.cdisvm.runtime.annotation.PyPosOnly;
 import io.github.cdisvm.runtime.annotation.PyVarArgs;
+import io.github.cdisvm.runtime.builtin.PyDefaultInstanceAttributes;
 import io.github.cdisvm.runtime.builtin.PyDefaultTypeAttributes;
 import io.github.cdisvm.runtime.builtin.PyObjectType;
 import io.github.cdisvm.runtime.builtin.PyTypeType;
 import io.github.cdisvm.runtime.builtin.PyUserTypeCallBuilder;
+import io.github.cdisvm.runtime.descriptor.PyDeleteDescriptor;
+import io.github.cdisvm.runtime.descriptor.PyGetDescriptor;
+import io.github.cdisvm.runtime.descriptor.PySetDescriptor;
 import io.github.cdisvm.runtime.exception.PyAttributeError;
 
 public class PyTypeCompiler {
@@ -254,9 +258,10 @@ public class PyTypeCompiler {
                     markerInterfaceCD);
 
             var attributeClass = createTypeAttributes(classInfo);
+            var instanceClassDesc = compileUserTypeInstance(classInfo, classDesc, ClassDesc.of(attributeClass));
             classBuilder.withField("INSTANCE", classDesc, Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
             classBuilder.withField("MRO", CD.of(List.class), Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
-            classBuilder.withField("ATTRIBUTES", ClassDesc.of(attributeClass), Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+            classBuilder.withField("ATTRIBUTES", ClassDesc.of(attributeClass), Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
 
             classBuilder.withMethodBody("<clinit>", MD.of(void.class), Modifier.PUBLIC | Modifier.STATIC, codeBuilder -> {
                 codeBuilder.new_(classDesc);
@@ -300,9 +305,9 @@ public class PyTypeCompiler {
                     codeBuilder.checkcast(CD.of(PyCallable.class));
                     codeBuilder.invokeinterface(CD.PY_CALLABLE, "pyCallBuilder", MD.of(PyCallBuilder.class));
 
-                    codeBuilder.new_(classDesc);
+                    codeBuilder.new_(instanceClassDesc);
                     codeBuilder.dup();
-                    codeBuilder.invokespecial(classDesc, "<init>", MD.of(void.class));
+                    codeBuilder.invokespecial(instanceClassDesc, "<init>", MD.of(void.class));
                     codeBuilder.dup_x1();
                     codeBuilder.invokeinterface(CD.PY_CALL_BUILDER, "$bindTo", MD.of(PyCallBuilder.class, PyObject.class));
                     codeBuilder.swap();
@@ -311,9 +316,9 @@ public class PyTypeCompiler {
                 } else {
                     codeBuilder.new_(CD.of(PyUserTypeCallBuilder.class));
                     codeBuilder.dup();
-                    codeBuilder.new_(classDesc);
+                    codeBuilder.new_(instanceClassDesc);
                     codeBuilder.dup();
-                    codeBuilder.invokespecial(classDesc, "<init>", MD.of(void.class));
+                    codeBuilder.invokespecial(instanceClassDesc, "<init>", MD.of(void.class));
                     codeBuilder.invokespecial(CD.of(PyUserTypeCallBuilder.class), "<init>", MD.of(void.class, PyObject.class));
                     codeBuilder.areturn();
                 }
@@ -363,8 +368,42 @@ public class PyTypeCompiler {
         }
     }
 
+    public ClassDesc compileUserTypeInstance(ClassInfo classInfo, ClassDesc typeClassDesc, ClassDesc typeAttributeClassDesc) {
+        var createdClass = cDisCompiler.createClass(classInfo.simpleName(), (classDesc, classBuilder) -> {
+            var markerInterfaceCD = getMarkerInterfaceDesc(classInfo.qualifiedName());
+            classBuilder.withInterfaceSymbols(CD.of(PyObject.class), markerInterfaceCD);
+
+            var attributeClass = createTypeInstanceAttributes(classInfo, typeClassDesc, typeAttributeClassDesc);
+            classBuilder.withField("$attributes", ClassDesc.of(attributeClass), Modifier.PRIVATE | Modifier.FINAL);
+
+            classBuilder.withMethodBody("<init>", MD.of(void.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(0);
+                codeBuilder.invokespecial(CD.OBJECT, "<init>", MD.of(void.class));
+                codeBuilder.aload(0);
+                codeBuilder.new_(ClassDesc.of(attributeClass));
+                codeBuilder.dup();
+                codeBuilder.aload(0);
+                codeBuilder.invokespecial(ClassDesc.of(attributeClass), "<init>", MD.of(void.class, PyObject.class));
+                codeBuilder.putfield(classDesc, "$attributes", ClassDesc.of(attributeClass));
+                codeBuilder.return_();
+            });
+
+            classBuilder.withMethodBody("pyType", MD.of(PyType.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.getstatic(typeClassDesc, "INSTANCE", typeClassDesc);
+                codeBuilder.areturn();
+            });
+
+            classBuilder.withMethodBody("pyAttributes", MD.of(PyAttributes.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(0);
+                codeBuilder.getfield(classDesc, "$attributes", ClassDesc.of(attributeClass));
+                codeBuilder.areturn();
+            });
+        });
+        return ClassDesc.of(createdClass);
+    }
+
     private String createTypeAttributes(ClassInfo classInfo) {
-        var createdClass = cDisCompiler.createClass(classInfo.qualifiedName() + "$Attributes", (classDesc, classBuilder) -> {
+        var createdClass = cDisCompiler.createClass(classInfo.qualifiedName() + "$TypeAttributes", (classDesc, classBuilder) -> {
             var attributeInterfaces = new ArrayList<ClassDesc>();
             attributeInterfaces.add(CD.of(PyAttributes.class));
             for (var attr : classInfo.classAttributeToType().keySet()) {
@@ -431,7 +470,7 @@ public class PyTypeCompiler {
                 });
             }
 
-            classBuilder.withMethodBody("getAttributeByName", MD.of(PyObject.class, String.class), Modifier.PUBLIC, codeBuilder -> {
+            classBuilder.withMethodBody("getAttributeByNameOrNull", MD.of(PyObject.class, String.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(1);
                 BytecodeUtil.implementStringSwitchCase(codeBuilder,
                         classInfo.classAttributeToType().keySet(),
@@ -439,26 +478,11 @@ public class PyTypeCompiler {
                         (attributeName, caseBuilder) -> {
                             caseBuilder.aload(0);
                             caseBuilder.getfield(classDesc, attributeName, CD.PY_OBJECT);
-                            caseBuilder.dup();
-                            caseBuilder.aconst_null();
-                            var returnLabel = caseBuilder.newLabel();
-                            caseBuilder.if_acmpne(returnLabel);
-
-                            caseBuilder.pop();
-                            caseBuilder.new_(CD.of(PyAttributeError.class));
-                            caseBuilder.dup();
-                            caseBuilder.loadConstant("<class '%s'> object has no attribute '%s'."
-                                    .formatted(classInfo.simpleName(), attributeName));
-                            caseBuilder.invokespecial(CD.of(PyAttributeError.class), "<init>",
-                                    MD.of(void.class, String.class));
-                            caseBuilder.athrow();
-
-                            caseBuilder.labelBinding(returnLabel);
                             caseBuilder.areturn();
                         });
                 codeBuilder.aload(0);
                 codeBuilder.aload(1);
-                codeBuilder.invokespecial(CD.of(PyDefaultTypeAttributes.class), "getAttributeByName", MD.of(PyObject.class, String.class));
+                codeBuilder.invokespecial(CD.of(PyDefaultTypeAttributes.class), "getAttributeByNameOrNull", MD.of(PyObject.class, String.class));
                 codeBuilder.areturn();
             });
 
@@ -494,6 +518,196 @@ public class PyTypeCompiler {
                 codeBuilder.aload(0);
                 codeBuilder.aload(1);
                 codeBuilder.invokespecial(CD.of(PyDefaultTypeAttributes.class), "deleteAttributeByName", MD.of(void.class, String.class));
+                codeBuilder.return_();
+            });
+        });
+        return createdClass;
+    }
+
+    private String createTypeInstanceAttributes(ClassInfo classInfo, ClassDesc typeClassDesc, ClassDesc typeAttributeClassDesc) {
+        var createdClass = cDisCompiler.createClass(classInfo.qualifiedName() + "$Attributes", (classDesc, classBuilder) -> {
+            var attributeInterfaces = new ArrayList<ClassDesc>();
+            attributeInterfaces.add(CD.of(PyAttributes.class));
+
+            for (var attr : classInfo.classAttributeToType().keySet()) {
+                var attributeDesc = getAttributeDesc(attr);
+                attributeInterfaces.add(attributeDesc.interfaceDesc());
+            }
+
+            for (var attr : classInfo.instanceAttributeToType().keySet()) {
+                var attributeDesc = getAttributeDesc(attr);
+                attributeInterfaces.add(attributeDesc.interfaceDesc());
+            }
+
+            classBuilder.withInterfaceSymbols(attributeInterfaces);
+            classBuilder.withSuperclass(CD.of(PyDefaultInstanceAttributes.class));
+
+            for (var attr : classInfo.instanceAttributeToType().entrySet()) {
+                classBuilder.withField(attr.getKey(), CD.PY_OBJECT, Modifier.PRIVATE);
+            }
+
+            classBuilder.withMethodBody("<init>", MD.of(void.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(0);
+                codeBuilder.aload(1);
+                codeBuilder.getstatic(typeClassDesc, "ATTRIBUTES", typeAttributeClassDesc);
+                codeBuilder.invokespecial(CD.of(PyDefaultInstanceAttributes.class), "<init>", MD.of(void.class, PyObject.class, PyAttributes.class));
+                codeBuilder.return_();
+            });
+
+            for (var attr : classInfo.classAttributeToType().keySet()) {
+                var attributeDesc = getAttributeDesc(attr);
+                classBuilder.withMethodBody(attributeDesc.getter(), MD.of(PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", CD.of(PyAttributes.class));
+                    codeBuilder.checkcast(typeAttributeClassDesc);
+                    codeBuilder.invokevirtual(typeAttributeClassDesc, attributeDesc.getter(), MD.of(PyObject.class));
+                    codeBuilder.dup();
+                    codeBuilder.instanceOf(CD.of(PyGetDescriptor.class));
+                    var nonDescriptor = codeBuilder.newLabel();
+                    codeBuilder.ifeq(nonDescriptor);
+
+                    codeBuilder.checkcast(CD.of(PyGetDescriptor.class));
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "instance", CD.PY_OBJECT);
+                    codeBuilder.getstatic(typeClassDesc, "INSTANCE", typeClassDesc);
+                    codeBuilder.invokeinterface(CD.of(PyGetDescriptor.class), "pyGet", MD.of(PyObject.class, PyObject.class, PyType.class));
+
+                    codeBuilder.labelBinding(nonDescriptor);
+                    codeBuilder.areturn();
+                });
+                classBuilder.withMethodBody(attributeDesc.setter(), MD.of(void.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", CD.of(PyAttributes.class));
+                    codeBuilder.checkcast(typeAttributeClassDesc);
+                    codeBuilder.invokevirtual(typeAttributeClassDesc, attributeDesc.getter(), MD.of(PyObject.class));
+                    codeBuilder.dup();
+                    codeBuilder.instanceOf(CD.of(PySetDescriptor.class));
+                    var nonDescriptor = codeBuilder.newLabel();
+                    codeBuilder.ifeq(nonDescriptor);
+
+                    codeBuilder.checkcast(CD.of(PySetDescriptor.class));
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "instance", CD.PY_OBJECT);
+                    codeBuilder.aload(1);
+                    codeBuilder.invokeinterface(CD.of(PySetDescriptor.class), "pySet", MD.of(void.class, PyObject.class, PyObject.class));
+                    codeBuilder.return_();
+
+                    codeBuilder.labelBinding(nonDescriptor);
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", CD.of(PyAttributes.class));
+                    codeBuilder.checkcast(typeAttributeClassDesc);
+                    codeBuilder.aload(1);
+                    codeBuilder.invokevirtual(typeAttributeClassDesc, attributeDesc.setter(), MD.of(void.class, PyObject.class));
+                    codeBuilder.return_();
+                });
+                classBuilder.withMethodBody(attributeDesc.delete(), MD.of(void.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", CD.of(PyAttributes.class));
+                    codeBuilder.checkcast(typeAttributeClassDesc);
+                    codeBuilder.invokevirtual(typeAttributeClassDesc, attributeDesc.getter(), MD.of(PyObject.class));
+                    codeBuilder.dup();
+                    codeBuilder.instanceOf(CD.of(PyDeleteDescriptor.class));
+                    var nonDescriptor = codeBuilder.newLabel();
+                    codeBuilder.ifeq(nonDescriptor);
+
+                    codeBuilder.checkcast(CD.of(PyDeleteDescriptor.class));
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "instance", CD.PY_OBJECT);
+                    codeBuilder.invokeinterface(CD.of(PyDeleteDescriptor.class), "pyDelete", MD.of(void.class, PyObject.class));
+                    codeBuilder.return_();
+
+                    codeBuilder.labelBinding(nonDescriptor);
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", CD.of(PyAttributes.class));
+                    codeBuilder.checkcast(typeAttributeClassDesc);
+                    codeBuilder.invokevirtual(typeAttributeClassDesc, attributeDesc.delete(), MD.of(void.class));
+                    codeBuilder.return_();
+                });
+            }
+
+            for (var attr : classInfo.instanceAttributeToType().keySet()) {
+                var attributeDesc = getAttributeDesc(attr);
+                classBuilder.withMethodBody(attributeDesc.getter(), MD.of(PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(classDesc, attr, CD.PY_OBJECT);
+                    codeBuilder.dup();
+                    codeBuilder.aconst_null();
+                    var returnLabel = codeBuilder.newLabel();
+                    codeBuilder.if_acmpne(returnLabel);
+
+                    codeBuilder.pop();
+                    codeBuilder.new_(CD.of(PyAttributeError.class));
+                    codeBuilder.dup();
+                    codeBuilder.loadConstant("<class '%s'> object has no attribute '%s'."
+                            .formatted(classInfo.simpleName(), attr));
+                    codeBuilder.invokespecial(CD.of(PyAttributeError.class), "<init>",
+                            MD.of(void.class, String.class));
+                    codeBuilder.athrow();
+
+                    codeBuilder.labelBinding(returnLabel);
+                    codeBuilder.areturn();
+                });
+                classBuilder.withMethodBody(attributeDesc.setter(), MD.of(void.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.aload(0);
+                    codeBuilder.aload(1);
+                    codeBuilder.putfield(classDesc, attr, CD.PY_OBJECT);
+                    codeBuilder.return_();
+                });
+                classBuilder.withMethodBody(attributeDesc.delete(), MD.of(void.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.aload(0);
+                    codeBuilder.aconst_null();
+                    codeBuilder.putfield(classDesc, attr, CD.PY_OBJECT);
+                    codeBuilder.return_();
+                });
+            }
+
+            classBuilder.withMethodBody("getAttributeByNameOrNull", MD.of(PyObject.class, String.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(1);
+                BytecodeUtil.implementStringSwitchCase(codeBuilder,
+                        classInfo.instanceAttributeToType().keySet(),
+                        true,
+                        (attributeName, caseBuilder) -> {
+                            caseBuilder.aload(0);
+                            caseBuilder.invokevirtual(classDesc, getAttributeDesc(attributeName).getter(), MD.of(PyObject.class));
+                            caseBuilder.areturn();
+                        });
+                codeBuilder.aload(0);
+                codeBuilder.aload(1);
+                codeBuilder.invokespecial(CD.of(PyDefaultInstanceAttributes.class), "getAttributeByNameOrNull", MD.of(PyObject.class, String.class));
+                codeBuilder.areturn();
+            });
+
+            classBuilder.withMethodBody("setAttributeByName", MD.of(void.class, String.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(1);
+                BytecodeUtil.implementStringSwitchCase(codeBuilder,
+                        classInfo.instanceAttributeToType().keySet(),
+                        true,
+                        (attributeName, caseBuilder) -> {
+                            caseBuilder.aload(0);
+                            caseBuilder.aload(2);
+                            caseBuilder.invokevirtual(classDesc, getAttributeDesc(attributeName).setter(), MD.of(void.class, PyObject.class));
+                            caseBuilder.return_();
+                        });
+                codeBuilder.aload(0);
+                codeBuilder.aload(1);
+                codeBuilder.aload(2);
+                codeBuilder.invokespecial(CD.of(PyDefaultInstanceAttributes.class), "setAttributeByName", MD.of(void.class, String.class, PyObject.class));
+                codeBuilder.return_();
+            });
+
+            classBuilder.withMethodBody("deleteAttributeByName", MD.of(void.class, String.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(1);
+                BytecodeUtil.implementStringSwitchCase(codeBuilder,
+                        classInfo.instanceAttributeToType().keySet(),
+                        true,
+                        (attributeName, caseBuilder) -> {
+                            caseBuilder.aload(0);
+                            caseBuilder.invokevirtual(classDesc, getAttributeDesc(attributeName).delete(), MD.of(void.class));
+                            caseBuilder.return_();
+                        });
+                codeBuilder.aload(0);
+                codeBuilder.aload(1);
+                codeBuilder.invokespecial(CD.of(PyDefaultInstanceAttributes.class), "deleteAttributeByName", MD.of(void.class, String.class));
                 codeBuilder.return_();
             });
         });

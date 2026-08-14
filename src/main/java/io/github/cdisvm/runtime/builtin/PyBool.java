@@ -9,9 +9,12 @@ import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
+import io.github.cdisvm.runtime.binary.PyBitAndAble;
+import io.github.cdisvm.runtime.binary.PyBitOrAble;
+import io.github.cdisvm.runtime.binary.PyBitXorAble;
 
 @PyBuiltin("bool")
-public record PyBool(boolean value) implements PyConstant {
+public record PyBool(boolean value) implements PyConstant, PyBitOrAble, PyBitAndAble, PyBitXorAble {
     public static PyType type;
 
     @PyBuiltin("True")
@@ -65,6 +68,21 @@ public record PyBool(boolean value) implements PyConstant {
 
     public PyBool negate() {
         return value? FALSE : TRUE;
+    }
+
+    @Override
+    public PyObject pyBitAnd(PyObject other) {
+        return PyBool.of(value & other.pyTruth().value);
+    }
+
+    @Override
+    public PyObject pyBitOr(PyObject other) {
+        return PyBool.of(value | other.pyTruth().value);
+    }
+
+    @Override
+    public PyObject pyBitXor(PyObject other) {
+        return PyBool.of(value ^ other.pyTruth().value);
     }
 
     @Override

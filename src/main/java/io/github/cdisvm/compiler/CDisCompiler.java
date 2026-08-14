@@ -35,6 +35,7 @@ import io.github.cdisvm.runtime.PyGlobal;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.descriptor.PyGetDescriptor;
 import io.github.cdisvm.runtime.exception.PyBaseException;
 
 public class CDisCompiler {
@@ -707,7 +708,11 @@ public class CDisCompiler {
         var callableClass = FunctionSignature.CALLABLE_PACKAGE + nextClassId() + "." + bytecode.functionName();
         var callableClassDescriptor = ClassDesc.of(callableClass);
         var classBytecode = classFile.build(callableClassDescriptor, classBuilder -> {
-            classBuilder.withInterfaceSymbols(CD.PY_CALLABLE, CD.of(PyConstant.class));
+            if (bytecode.methodType() == MethodType.STATIC) {
+                classBuilder.withInterfaceSymbols(CD.PY_CALLABLE, CD.of(PyConstant.class));
+            } else {
+                classBuilder.withInterfaceSymbols(CD.PY_CALLABLE, CD.of(PyConstant.class), CD.of(PyGetDescriptor.class));
+            }
 
             Map<String, PyConstant> constantMap = new LinkedHashMap<>();
             Map<String, PyGlobal> globalMap = new LinkedHashMap<>();
@@ -741,6 +746,9 @@ public class CDisCompiler {
 
             classBuilder.withField("$default", CD.PY_OBJECT.arrayType(), Modifier.PRIVATE);
             classBuilder.withField("$defaultIndices", CD.INT.arrayType(), Modifier.PRIVATE);
+            if (bytecode.methodType() != MethodType.STATIC) {
+                classBuilder.withField("$bound", CD.PY_OBJECT, Modifier.PRIVATE | Modifier.FINAL);
+            }
 
             classBuilder.withMethodBody("<init>", MD.of(void.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(0);
@@ -759,8 +767,67 @@ public class CDisCompiler {
                 codeBuilder.aload(0);
                 codeBuilder.aconst_null();
                 codeBuilder.putfield(callableClassDescriptor, "$defaultIndices", CD.INT.arrayType());
+
+                if (bytecode.methodType() != MethodType.STATIC) {
+                    codeBuilder.aload(0);
+                    codeBuilder.aconst_null();
+                    codeBuilder.putfield(callableClassDescriptor, "$bound", CD.PY_OBJECT);
+                }
+
                 codeBuilder.return_();
             });
+
+            if (bytecode.methodType() != MethodType.STATIC) {
+                classBuilder.withMethodBody("<init>", MD.of(void.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.aload(0);
+                    codeBuilder.invokespecial(CD.OBJECT, "<init>", MD.of(void.class));
+                    for (var freeName : bytecode.freeNames()) {
+                        codeBuilder.aload(0);
+                        codeBuilder.new_(CD.PY_CELL);
+                        codeBuilder.dup();
+                        codeBuilder.invokespecial(CD.PY_CELL, "<init>", MD.of(void.class));
+                        codeBuilder.putfield(callableClassDescriptor, freeName, CD.PY_CELL);
+                    }
+                    codeBuilder.aload(0);
+                    codeBuilder.aconst_null();
+                    codeBuilder.putfield(callableClassDescriptor, "$default", CD.PY_OBJECT.arrayType());
+
+                    codeBuilder.aload(0);
+                    codeBuilder.aconst_null();
+                    codeBuilder.putfield(callableClassDescriptor, "$defaultIndices", CD.INT.arrayType());
+
+                    codeBuilder.aload(0);
+                    codeBuilder.aload(1);
+                    codeBuilder.putfield(callableClassDescriptor, "$bound", CD.PY_OBJECT);
+
+                    codeBuilder.return_();
+                });
+            }
+
+            if (bytecode.methodType() != MethodType.STATIC) {
+                classBuilder.withMethodBody("pyGet", MD.of(PyObject.class, PyObject.class, PyType.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.new_(callableClassDescriptor);
+                    codeBuilder.dup();
+                    switch (bytecode.methodType()) {
+                        case VIRTUAL -> {
+                            codeBuilder.aload(1);
+                        }
+                        case CLASS -> {
+                            codeBuilder.aload(2);
+                        }
+                    }
+                    codeBuilder.invokespecial(callableClassDescriptor, "<init>", MD.of(void.class, PyObject.class));
+                    codeBuilder.dup();
+
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(callableClassDescriptor, "$default", CD.PY_OBJECT.arrayType());
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(callableClassDescriptor, "$defaultIndices", CD.INT.arrayType());
+                    codeBuilder.invokevirtual(callableClassDescriptor, "set$Default", MD.of(void.class, PyObject[].class, int[].class));
+
+                    codeBuilder.areturn();
+                });
+            }
 
             classBuilder.withMethodBody("loadValueOntoStack", MD.of(void.class, CodeBuilder.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(1);
@@ -804,7 +871,22 @@ public class CDisCompiler {
                 codeBuilder.dup();
                 codeBuilder.aload(0);
                 codeBuilder.invokespecial(callBuilderClassDescriptor, "<init>", MD.of(void.class, PyCallable.class));
-                codeBuilder.return_(TypeKind.REFERENCE);
+                if (bytecode.methodType() != MethodType.STATIC) {
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(callableClassDescriptor, "$bound", CD.PY_OBJECT);
+                    codeBuilder.dup();
+                    codeBuilder.aconst_null();
+
+                    var noBinding = codeBuilder.newLabel();
+                    codeBuilder.if_acmpeq(noBinding);
+
+                    codeBuilder.invokeinterface(CD.of(PyCallBuilder.class), "$bindTo", MD.of(PyCallBuilder.class, PyObject.class));
+                    codeBuilder.areturn();
+
+                    codeBuilder.labelBinding(noBinding);
+                    codeBuilder.pop();
+                }
+                codeBuilder.areturn();
 
                 codeBuilder.labelBinding(overrideDefaults);
                 codeBuilder.new_(callBuilderClassDescriptor);
@@ -818,7 +900,22 @@ public class CDisCompiler {
                 codeBuilder.getfield(callableClassDescriptor, "$defaultIndices", CD.INT.arrayType());
 
                 codeBuilder.invokespecial(callBuilderClassDescriptor, "<init>", MD.of(void.class, PyCallable.class, PyObject[].class, int[].class));
-                codeBuilder.return_(TypeKind.REFERENCE);
+                if (bytecode.methodType() != MethodType.STATIC) {
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(callableClassDescriptor, "$bound", CD.PY_OBJECT);
+                    codeBuilder.dup();
+                    codeBuilder.aconst_null();
+
+                    var noBinding = codeBuilder.newLabel();
+                    codeBuilder.if_acmpeq(noBinding);
+
+                    codeBuilder.invokeinterface(CD.of(PyCallBuilder.class), "$bindTo", MD.of(PyCallBuilder.class, PyObject.class));
+                    codeBuilder.areturn();
+
+                    codeBuilder.labelBinding(noBinding);
+                    codeBuilder.pop();
+                }
+                codeBuilder.areturn();
             });
 
             for (var freeName : bytecode.freeNames()) {

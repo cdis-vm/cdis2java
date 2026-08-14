@@ -1,5 +1,7 @@
 package io.github.cdisvm.runtime.exception;
 
+import java.util.Map;
+
 import org.jspecify.annotations.Nullable;
 
 import io.github.cdisvm.runtime.PyAttributes;
@@ -8,8 +10,10 @@ import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.annotation.PyVarArgs;
+import io.github.cdisvm.runtime.builtin.PyDefaultAttributes;
 import io.github.cdisvm.runtime.builtin.PyEmptyAttributes;
 import io.github.cdisvm.runtime.builtin.PyList;
+import io.github.cdisvm.runtime.builtin.PyNone;
 import io.github.cdisvm.runtime.builtin.PyStr;
 import io.github.cdisvm.runtime.builtin.PyTuple;
 
@@ -54,7 +58,23 @@ public class PyBaseException extends RuntimeException implements PyObject {
 
     @Override
     public PyAttributes pyAttributes() {
-        return PyEmptyAttributes.INSTANCE;
+        if (__notes__ == null) {
+            return new PyDefaultAttributes(
+                    Map.of(
+                            "args", args,
+                            "__traceback__", PyNone.INSTANCE
+                    )
+            );
+        } else {
+            return new PyDefaultAttributes(
+                    Map.of(
+                            "args", args,
+                            "__traceback__", PyNone.INSTANCE,
+                            "__notes__", __notes__
+                            )
+            );
+        }
+
     }
 
     @Override

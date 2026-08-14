@@ -12,16 +12,16 @@ public class PyDefaultAttributes implements PyAttributes {
 
     public PyDefaultAttributes() {}
 
+    public PyDefaultAttributes(Map<String, PyObject> attributeToValue) {
+        this.attributeToValue = attributeToValue;
+    }
+
     @Override
-    public PyObject getAttributeByName(String name) {
+    public PyObject getAttributeByNameOrNull(String name) {
         if (attributeToValue == null) {
-            throw new PyAttributeError("object does not have attribute '%s'".formatted(name));
+            return null;
         }
-        var out = attributeToValue.get(name);
-        if (out == null) {
-            throw new PyAttributeError("object does not have attribute '%s'".formatted(name));
-        }
-        return out;
+        return attributeToValue.get(name);
     }
 
     @Override

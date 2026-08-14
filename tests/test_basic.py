@@ -1037,6 +1037,8 @@ def test_context_manager_shallow_exception_if_any_exit_truthful():
         return y
 
     match = create_function_match_asserter(fun)
+
+    # TODO: Find a way to convert these instances
     match(A(), B())
     match(B(), A())
 

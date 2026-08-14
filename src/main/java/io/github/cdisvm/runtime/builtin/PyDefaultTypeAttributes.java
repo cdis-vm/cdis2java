@@ -13,16 +13,11 @@ public class PyDefaultTypeAttributes implements PyAttributes {
     public PyDefaultTypeAttributes() {}
 
     @Override
-    public PyObject getAttributeByName(String name) {
+    public PyObject getAttributeByNameOrNull(String name) {
         if (attributeToValue == null) {
-            throw new PyAttributeError("object does not have attribute '%s'".formatted(name));
+            return null;
         }
-        // TODO: descriptor protocol
-        var out = attributeToValue.get(name);
-        if (out == null) {
-            throw new PyAttributeError("object does not have attribute '%s'".formatted(name));
-        }
-        return out;
+        return attributeToValue.get(name);
     }
 
     @Override
@@ -30,7 +25,6 @@ public class PyDefaultTypeAttributes implements PyAttributes {
         if (attributeToValue == null) {
             attributeToValue = new LinkedHashMap<>();
         }
-        // TODO: descriptor protocol
         attributeToValue.put(name, value);
     }
 
@@ -39,7 +33,6 @@ public class PyDefaultTypeAttributes implements PyAttributes {
         if (attributeToValue == null) {
             return;
         }
-        // TODO: descriptor protocol
         attributeToValue.remove(name);
     }
 }

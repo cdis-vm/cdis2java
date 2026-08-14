@@ -111,6 +111,10 @@ def _convert_py_constant(value, visited=None):
 
     if is_defined_in_c(value):
         return None
+
+    if not is_defined_in_c(type(value)):
+        java_type = _convert_py_constant(type(value), visited)
+        return java_type.pyCallBuilder().pyCall()
     raise ValueError(f"Unsupported constant type: {type(value)}")
 
 

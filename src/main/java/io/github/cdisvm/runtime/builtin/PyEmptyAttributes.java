@@ -10,8 +10,8 @@ public final class PyEmptyAttributes implements PyAttributes {
     private PyEmptyAttributes() {}
 
     @Override
-    public PyObject getAttributeByName(String name) {
-        throw new PyAttributeError();
+    public PyObject getAttributeByNameOrNull(String name) {
+        return null;
     }
 
     @Override
