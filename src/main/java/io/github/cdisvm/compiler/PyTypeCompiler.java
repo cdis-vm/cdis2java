@@ -18,6 +18,7 @@ import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyCallBuilder;
 import io.github.cdisvm.runtime.PyCallable;
 import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyIterator;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
@@ -36,13 +37,14 @@ import io.github.cdisvm.runtime.descriptor.PyDeleteDescriptor;
 import io.github.cdisvm.runtime.descriptor.PyGetDescriptor;
 import io.github.cdisvm.runtime.descriptor.PySetDescriptor;
 import io.github.cdisvm.runtime.exception.PyAttributeError;
+import io.github.cdisvm.runtime.exception.PyStopIteration;
 
 public class PyTypeCompiler {
     private final CDisCompiler cDisCompiler;
     private final Map<Class<?>, PyType> classToCompiledType;
     private final Map<Class<?>, ClassDesc> classToMarkerInterfaceDesc;
     private final Map<String, AttributeDesc> attributeNameToAttributeDesc;
-    private final Map<String, PyType> qualifiedNameToCompiledUserType;
+    private final Map<ClassInfo, PyType> classInfoToCompiledUserType;
     private final Map<String, ClassDesc> qualifiedNameToMarkerInterfaceDesc;
 
     public PyTypeCompiler(CDisCompiler cDisCompiler) {
@@ -50,7 +52,7 @@ public class PyTypeCompiler {
         classToCompiledType = new LinkedHashMap<>();
         classToMarkerInterfaceDesc = new LinkedHashMap<>();
         attributeNameToAttributeDesc = new LinkedHashMap<>();
-        qualifiedNameToCompiledUserType = new LinkedHashMap<>();
+        classInfoToCompiledUserType = new LinkedHashMap<>();
         qualifiedNameToMarkerInterfaceDesc = new LinkedHashMap<>();
     }
 
@@ -249,8 +251,8 @@ public class PyTypeCompiler {
     }
 
     public PyType compileUserType(ClassInfo classInfo) {
-        if (qualifiedNameToCompiledUserType.containsKey(classInfo.qualifiedName())) {
-            return qualifiedNameToCompiledUserType.get(classInfo.qualifiedName());
+        if (classInfoToCompiledUserType.containsKey(classInfo)) {
+            return classInfoToCompiledUserType.get(classInfo);
         }
         var createdClass = cDisCompiler.createClass(classInfo.simpleName() + "Type", (classDesc, classBuilder) -> {
             var markerInterfaceCD = getMarkerInterfaceDesc(classInfo.qualifiedName());
@@ -361,7 +363,7 @@ public class PyTypeCompiler {
         var loadedClass = cDisCompiler.loadClass(createdClass);
         try {
             var compiledType = (PyType) loadedClass.getField("INSTANCE").get(null);
-            qualifiedNameToCompiledUserType.put(classInfo.qualifiedName(), compiledType);
+            classInfoToCompiledUserType.put(classInfo, compiledType);
             return compiledType;
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
@@ -369,9 +371,17 @@ public class PyTypeCompiler {
     }
 
     public ClassDesc compileUserTypeInstance(ClassInfo classInfo, ClassDesc typeClassDesc, ClassDesc typeAttributeClassDesc) {
+        var hasIteratorProtocol = classInfo.classAttributeToDefaultValue().containsKey("__iter__")
+                && classInfo.classAttributeToDefaultValue().containsKey("__next__");
         var createdClass = cDisCompiler.createClass(classInfo.simpleName(), (classDesc, classBuilder) -> {
             var markerInterfaceCD = getMarkerInterfaceDesc(classInfo.qualifiedName());
-            classBuilder.withInterfaceSymbols(CD.of(PyObject.class), markerInterfaceCD);
+            var interfaces = new ArrayList<ClassDesc>();
+            interfaces.add(CD.of(PyObject.class));
+            interfaces.add(markerInterfaceCD);
+            if (hasIteratorProtocol) {
+                interfaces.add(CD.of(PyIterator.class));
+            }
+            classBuilder.withInterfaceSymbols(interfaces);
 
             var attributeClass = createTypeInstanceAttributes(classInfo, typeClassDesc, typeAttributeClassDesc);
             classBuilder.withField("$attributes", ClassDesc.of(attributeClass), Modifier.PRIVATE | Modifier.FINAL);
@@ -398,6 +408,42 @@ public class PyTypeCompiler {
                 codeBuilder.getfield(classDesc, "$attributes", ClassDesc.of(attributeClass));
                 codeBuilder.areturn();
             });
+
+            if (hasIteratorProtocol) {
+                classBuilder.withMethodBody("pyIterator", MD.of(PyIterator.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.aload(0);
+                    codeBuilder.invokeinterface(CD.PY_OBJECT, "pyAttributes", MD.of(PyAttributes.class));
+                    codeBuilder.loadConstant("__iter__");
+                    codeBuilder.invokeinterface(CD.of(PyAttributes.class), "getAttributeByName", MD.of(PyObject.class, String.class));
+                    codeBuilder.checkcast(CD.PY_CALLABLE);
+                    codeBuilder.invokeinterface(CD.PY_CALLABLE, "pyCallBuilder", MD.of(PyCallBuilder.class));
+                    codeBuilder.aload(0);
+                    codeBuilder.invokeinterface(CD.PY_CALL_BUILDER, "$appendArgument", MD.of(PyCallBuilder.class, PyObject.class));
+                    codeBuilder.invokeinterface(CD.PY_CALL_BUILDER, "pyCall", MD.of(PyObject.class));
+                    codeBuilder.checkcast(CD.PY_ITERATOR);
+                    codeBuilder.areturn();
+                });
+                classBuilder.withMethodBody("pyNext", MD.of(PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.trying(
+                            tryBlock -> {
+                                tryBlock.aload(0);
+                                tryBlock.invokeinterface(CD.PY_OBJECT, "pyAttributes", MD.of(PyAttributes.class));
+                                tryBlock.loadConstant("__next__");
+                                tryBlock.invokeinterface(CD.of(PyAttributes.class), "getAttributeByName", MD.of(PyObject.class, String.class));
+                                tryBlock.checkcast(CD.PY_CALLABLE);
+                                tryBlock.invokeinterface(CD.PY_CALLABLE, "pyCallBuilder", MD.of(PyCallBuilder.class));
+                                tryBlock.aload(0);
+                                tryBlock.invokeinterface(CD.PY_CALL_BUILDER, "$appendArgument", MD.of(PyCallBuilder.class, PyObject.class));
+                                tryBlock.invokeinterface(CD.PY_CALL_BUILDER, "pyCall", MD.of(PyObject.class));
+                                tryBlock.areturn();
+                            },
+                            catchBlock -> catchBlock.catching(CD.of(PyStopIteration.class), catchCode -> {
+                                catchCode.pop();
+                                catchCode.aconst_null();
+                                catchCode.areturn();
+                            }));
+                });
+            }
         });
         return ClassDesc.of(createdClass);
     }
