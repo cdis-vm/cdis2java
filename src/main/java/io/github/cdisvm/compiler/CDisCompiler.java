@@ -448,7 +448,7 @@ public class CDisCompiler {
             codeBuilder.getfield(callBuilderClassDesc, "$binding", CD.PY_OBJECT);
             var hasNoBinding = codeBuilder.newLabel();
             codeBuilder.aconst_null();
-            codeBuilder.if_acmpne(hasNoBinding);
+            codeBuilder.if_acmpeq(hasNoBinding);
 
             codeBuilder.aload(0);
             codeBuilder.aload(1);
@@ -1003,6 +1003,10 @@ public class CDisCompiler {
                 codeBuilder.athrow();
 
                 codeBuilder.labelBinding(codeStartLabel);
+                for (var i = 0; i < compileRun.syntheticCount(); i++) {
+                    codeBuilder.aconst_null();
+                    codeBuilder.astore(compileRun.getSyntheticSlot(i));
+                }
                 implementInstructions(codeBuilder, compileRun, bytecode, -1, -1, 0,
                         bytecode.instructions().size());
             });

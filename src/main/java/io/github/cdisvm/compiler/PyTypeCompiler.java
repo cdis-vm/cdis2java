@@ -18,6 +18,7 @@ import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyCallBuilder;
 import io.github.cdisvm.runtime.PyCallable;
 import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyIterable;
 import io.github.cdisvm.runtime.PyIterator;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
@@ -379,6 +380,7 @@ public class PyTypeCompiler {
             interfaces.add(CD.of(PyObject.class));
             interfaces.add(markerInterfaceCD);
             if (hasIteratorProtocol) {
+                interfaces.add(CD.of(PyIterable.class));
                 interfaces.add(CD.of(PyIterator.class));
             }
             classBuilder.withInterfaceSymbols(interfaces);
@@ -417,8 +419,6 @@ public class PyTypeCompiler {
                     codeBuilder.invokeinterface(CD.of(PyAttributes.class), "getAttributeByName", MD.of(PyObject.class, String.class));
                     codeBuilder.checkcast(CD.PY_CALLABLE);
                     codeBuilder.invokeinterface(CD.PY_CALLABLE, "pyCallBuilder", MD.of(PyCallBuilder.class));
-                    codeBuilder.aload(0);
-                    codeBuilder.invokeinterface(CD.PY_CALL_BUILDER, "$appendArgument", MD.of(PyCallBuilder.class, PyObject.class));
                     codeBuilder.invokeinterface(CD.PY_CALL_BUILDER, "pyCall", MD.of(PyObject.class));
                     codeBuilder.checkcast(CD.PY_ITERATOR);
                     codeBuilder.areturn();
@@ -432,8 +432,6 @@ public class PyTypeCompiler {
                                 tryBlock.invokeinterface(CD.of(PyAttributes.class), "getAttributeByName", MD.of(PyObject.class, String.class));
                                 tryBlock.checkcast(CD.PY_CALLABLE);
                                 tryBlock.invokeinterface(CD.PY_CALLABLE, "pyCallBuilder", MD.of(PyCallBuilder.class));
-                                tryBlock.aload(0);
-                                tryBlock.invokeinterface(CD.PY_CALL_BUILDER, "$appendArgument", MD.of(PyCallBuilder.class, PyObject.class));
                                 tryBlock.invokeinterface(CD.PY_CALL_BUILDER, "pyCall", MD.of(PyObject.class));
                                 tryBlock.areturn();
                             },
@@ -604,7 +602,7 @@ public class PyTypeCompiler {
                 var attributeDesc = getAttributeDesc(attr);
                 classBuilder.withMethodBody(attributeDesc.getter(), MD.of(PyObject.class), Modifier.PUBLIC, codeBuilder -> {
                     codeBuilder.aload(0);
-                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", CD.of(PyAttributes.class));
+                    codeBuilder.invokevirtual(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", MD.of(PyAttributes.class));
                     codeBuilder.checkcast(typeAttributeClassDesc);
                     codeBuilder.invokevirtual(typeAttributeClassDesc, attributeDesc.getter(), MD.of(PyObject.class));
                     codeBuilder.dup();
@@ -614,7 +612,7 @@ public class PyTypeCompiler {
 
                     codeBuilder.checkcast(CD.of(PyGetDescriptor.class));
                     codeBuilder.aload(0);
-                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "instance", CD.PY_OBJECT);
+                    codeBuilder.invokevirtual(CD.of(PyDefaultInstanceAttributes.class), "instance", MD.of(PyObject.class));
                     codeBuilder.getstatic(typeClassDesc, "INSTANCE", typeClassDesc);
                     codeBuilder.invokeinterface(CD.of(PyGetDescriptor.class), "pyGet", MD.of(PyObject.class, PyObject.class, PyType.class));
 
@@ -623,7 +621,7 @@ public class PyTypeCompiler {
                 });
                 classBuilder.withMethodBody(attributeDesc.setter(), MD.of(void.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
                     codeBuilder.aload(0);
-                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", CD.of(PyAttributes.class));
+                    codeBuilder.invokevirtual(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", MD.of(PyAttributes.class));
                     codeBuilder.checkcast(typeAttributeClassDesc);
                     codeBuilder.invokevirtual(typeAttributeClassDesc, attributeDesc.getter(), MD.of(PyObject.class));
                     codeBuilder.dup();
@@ -633,14 +631,14 @@ public class PyTypeCompiler {
 
                     codeBuilder.checkcast(CD.of(PySetDescriptor.class));
                     codeBuilder.aload(0);
-                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "instance", CD.PY_OBJECT);
+                    codeBuilder.invokevirtual(CD.of(PyDefaultInstanceAttributes.class), "instance", MD.of(PyObject.class));
                     codeBuilder.aload(1);
                     codeBuilder.invokeinterface(CD.of(PySetDescriptor.class), "pySet", MD.of(void.class, PyObject.class, PyObject.class));
                     codeBuilder.return_();
 
                     codeBuilder.labelBinding(nonDescriptor);
                     codeBuilder.aload(0);
-                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", CD.of(PyAttributes.class));
+                    codeBuilder.invokevirtual(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", MD.of(PyAttributes.class));
                     codeBuilder.checkcast(typeAttributeClassDesc);
                     codeBuilder.aload(1);
                     codeBuilder.invokevirtual(typeAttributeClassDesc, attributeDesc.setter(), MD.of(void.class, PyObject.class));
@@ -648,7 +646,7 @@ public class PyTypeCompiler {
                 });
                 classBuilder.withMethodBody(attributeDesc.delete(), MD.of(void.class), Modifier.PUBLIC, codeBuilder -> {
                     codeBuilder.aload(0);
-                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", CD.of(PyAttributes.class));
+                    codeBuilder.invokevirtual(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", MD.of(PyAttributes.class));
                     codeBuilder.checkcast(typeAttributeClassDesc);
                     codeBuilder.invokevirtual(typeAttributeClassDesc, attributeDesc.getter(), MD.of(PyObject.class));
                     codeBuilder.dup();
@@ -658,13 +656,13 @@ public class PyTypeCompiler {
 
                     codeBuilder.checkcast(CD.of(PyDeleteDescriptor.class));
                     codeBuilder.aload(0);
-                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "instance", CD.PY_OBJECT);
+                    codeBuilder.invokevirtual(CD.of(PyDefaultInstanceAttributes.class), "instance", MD.of(PyObject.class));
                     codeBuilder.invokeinterface(CD.of(PyDeleteDescriptor.class), "pyDelete", MD.of(void.class, PyObject.class));
                     codeBuilder.return_();
 
                     codeBuilder.labelBinding(nonDescriptor);
                     codeBuilder.aload(0);
-                    codeBuilder.getfield(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", CD.of(PyAttributes.class));
+                    codeBuilder.invokevirtual(CD.of(PyDefaultInstanceAttributes.class), "typeAttributes", MD.of(PyAttributes.class));
                     codeBuilder.checkcast(typeAttributeClassDesc);
                     codeBuilder.invokevirtual(typeAttributeClassDesc, attributeDesc.delete(), MD.of(void.class));
                     codeBuilder.return_();

@@ -42,12 +42,12 @@ public record DelegateOrRestoreGeneratorState(int stateId,
 
     @Override
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
+        var savedStackSize = savedStackMetadata().stack().size();
         var generatorSlot = compilationRun.getWorkSlot(0);
         var stateListSlot = compilationRun.getWorkSlot(1);
         var variablesDictSlot = compilationRun.getWorkSlot(2);
         var operationSlot = compilationRun.getWorkSlot(3);
-        var savedStackSizeSlot = compilationRun.getWorkSlot(4);
-        var stackIndexSlot = compilationRun.getWorkSlot(5);
+        var firstStackItemSlot = compilationRun.getWorkSlot(4);
         var notThrowLabel = codeBuilder.newLabel();
 
         codeBuilder.astore(generatorSlot);
@@ -61,64 +61,54 @@ public record DelegateOrRestoreGeneratorState(int stateId,
         codeBuilder.astore(stateListSlot);
 
         // Saved state layout: [stack items (N), variables dict (1), synthetic values (K)]
-        codeBuilder.aload(stateListSlot);
-        codeBuilder.invokevirtual(CD.PY_LIST, "size", MD.of(int.class));
-        codeBuilder.loadConstant(1 + compilationRun.syntheticCount());
-        codeBuilder.isub();
-        codeBuilder.istore(savedStackSizeSlot);
+        for (var i = 0; i < savedStackSize; i++) {
+            codeBuilder.aload(stateListSlot);
+            codeBuilder.dup();
+            codeBuilder.loadConstant(i);
+            codeBuilder.invokevirtual(CD.PY_LIST, "get", MD.of(PyObject.class, int.class));
+            codeBuilder.astore(firstStackItemSlot + i);
+            codeBuilder.pop();
+        }
 
-        // Restore the saved stack
-        codeBuilder.aload(stateListSlot);
-        codeBuilder.loadConstant(0);
-        codeBuilder.istore(stackIndexSlot);
-        var stackRestoreLoopStart = codeBuilder.newLabel();
-        var stackRestoreLoopEnd = codeBuilder.newLabel();
-        codeBuilder.labelBinding(stackRestoreLoopStart);
-        codeBuilder.iload(stackIndexSlot);
-        codeBuilder.iload(savedStackSizeSlot);
-        codeBuilder.if_icmpge(stackRestoreLoopEnd);
-        codeBuilder.dup();
-        codeBuilder.iload(stackIndexSlot);
-        codeBuilder.invokevirtual(CD.PY_LIST, "get", MD.of(PyObject.class, int.class));
-        codeBuilder.iinc(stackIndexSlot, 1);
-        codeBuilder.goto_(stackRestoreLoopStart);
-        codeBuilder.labelBinding(stackRestoreLoopEnd);
-        codeBuilder.pop();
+        for (var i = 0; i < savedStackSize; i++) {
+            codeBuilder.aload(firstStackItemSlot + i);
+        }
+
+        // Discard the saved yield value (present only when a yield value was saved)
+        if (savedStackSize > 0) {
+            codeBuilder.pop();
+        }
 
         // Restore the synthetic variables
-        codeBuilder.aload(stateListSlot);
         for (var i = 0; i < compilationRun.syntheticCount(); i++) {
+            codeBuilder.aload(stateListSlot);
             codeBuilder.dup();
-            codeBuilder.iload(savedStackSizeSlot);
-            codeBuilder.loadConstant(1 + i);
-            codeBuilder.iadd();
+            codeBuilder.loadConstant(savedStackSize + 1 + i);
             codeBuilder.invokevirtual(CD.PY_LIST, "get", MD.of(PyObject.class, int.class));
             codeBuilder.astore(compilationRun.getSyntheticSlot(i));
+            codeBuilder.pop();
         }
-        codeBuilder.pop();
 
         // Restore the local variables
         codeBuilder.aload(stateListSlot);
         codeBuilder.dup();
-        codeBuilder.iload(savedStackSizeSlot);
+        codeBuilder.loadConstant(savedStackSize);
         codeBuilder.invokevirtual(CD.PY_LIST, "get", MD.of(PyObject.class, int.class));
         codeBuilder.checkcast(CD.of(PyDict.class));
         codeBuilder.astore(variablesDictSlot);
         codeBuilder.pop();
 
         codeBuilder.aload(variablesDictSlot);
-        for (var variableEntry : compilationRun.variableNameToSlot().entrySet()) {
+        for (var variableName : savedStackMetadata().localVariables().keySet()) {
+            var slot = compilationRun.variableNameToSlot().get(variableName);
             codeBuilder.dup();
             codeBuilder.new_(CD.of(PyStr.class));
             codeBuilder.dup();
-            codeBuilder.loadConstant(variableEntry.getKey());
+            codeBuilder.loadConstant(variableName);
             codeBuilder.invokespecial(CD.of(PyStr.class), "<init>", MD.of(void.class, String.class));
             codeBuilder.invokevirtual(CD.of(PyDict.class), "get", MD.of(PyObject.class, Object.class));
-            codeBuilder.astore(variableEntry.getValue());
+            codeBuilder.astore(slot);
         }
-        codeBuilder.pop();
-
-        // Discard the saved yield value
         codeBuilder.pop();
 
         codeBuilder.aload(generatorSlot);

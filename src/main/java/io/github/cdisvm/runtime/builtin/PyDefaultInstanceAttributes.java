@@ -20,6 +20,14 @@ public class PyDefaultInstanceAttributes implements PyAttributes {
         this.typeAttributes = typeAttributes;
     }
 
+    public PyObject instance() {
+        return instance;
+    }
+
+    public PyAttributes typeAttributes() {
+        return typeAttributes;
+    }
+
     @Override
     public PyObject getAttributeByNameOrNull(String name) {
         var typeAttribute = typeAttributes.getAttributeByNameOrNull(name);

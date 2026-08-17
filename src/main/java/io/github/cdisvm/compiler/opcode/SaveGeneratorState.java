@@ -37,7 +37,7 @@ public record SaveGeneratorState(int stateId, StackMetadata savedStackMetadata) 
     @Override
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
         // The generator on top of stack is not saved; everything below it is
-        var savedStackSize = stackMetadata.stack().size() - 1;
+        var savedStackSize = savedStackMetadata().stack().size();
         var generatorSlot = compilationRun.getWorkSlot(0);
         var stateListSlot = compilationRun.getWorkSlot(1);
         var firstStackItemSlot = compilationRun.getWorkSlot(2);
@@ -48,6 +48,7 @@ public record SaveGeneratorState(int stateId, StackMetadata savedStackMetadata) 
         }
 
         codeBuilder.new_(CD.PY_LIST);
+        codeBuilder.dup();
         codeBuilder.invokespecial(CD.PY_LIST, "<init>", MD.of(void.class));
         for (var i = 0; i < savedStackSize; i++) {
             codeBuilder.dup();
@@ -56,19 +57,33 @@ public record SaveGeneratorState(int stateId, StackMetadata savedStackMetadata) 
             codeBuilder.pop();
         }
 
+        var variablesDictSlot = compilationRun.getWorkSlot(3);
         codeBuilder.new_(CD.of(PyDict.class));
+        codeBuilder.dup();
         codeBuilder.invokespecial(CD.of(PyDict.class), "<init>", MD.of(void.class));
-        for (var variableEntry : compilationRun.variableNameToSlot().entrySet()) {
+        codeBuilder.astore(variablesDictSlot);
+
+        codeBuilder.aload(variablesDictSlot);
+        for (var variableName : savedStackMetadata().localVariables().keySet()) {
+            var slot = compilationRun.variableNameToSlot().get(variableName);
             codeBuilder.dup();
             codeBuilder.new_(CD.of(PyStr.class));
             codeBuilder.dup();
-            codeBuilder.loadConstant(variableEntry.getKey());
+            codeBuilder.loadConstant(variableName);
             codeBuilder.invokespecial(CD.of(PyStr.class), "<init>", MD.of(void.class, String.class));
-            codeBuilder.aload(variableEntry.getValue());
+            codeBuilder.aload(slot);
             codeBuilder.invokevirtual(CD.of(PyDict.class), "put", MD.of(Object.class, Object.class, Object.class));
             codeBuilder.pop();
         }
+        codeBuilder.pop();
 
+        // Add the variables dict to the state list
+        codeBuilder.dup();
+        codeBuilder.aload(variablesDictSlot);
+        codeBuilder.invokevirtual(CD.PY_LIST, "add", MD.of(boolean.class, PyObject.class));
+        codeBuilder.pop();
+
+        // Add the synthetic values to the state list
         for (var i = 0; i < compilationRun.syntheticCount(); i++) {
             codeBuilder.dup();
             codeBuilder.aload(compilationRun.getSyntheticSlot(i));
@@ -77,6 +92,11 @@ public record SaveGeneratorState(int stateId, StackMetadata savedStackMetadata) 
         }
 
         codeBuilder.astore(stateListSlot);
+
+        // Re-push the saved stack items (yield value on top) so they can be returned
+        for (var i = 0; i < savedStackSize; i++) {
+            codeBuilder.aload(firstStackItemSlot + i);
+        }
 
         codeBuilder.aload(generatorSlot);
         codeBuilder.invokeinterface(CD.PY_OBJECT, "pyAttributes", MD.of(PyAttributes.class));

@@ -4,7 +4,7 @@ import java.util.Iterator;
 
 import org.jspecify.annotations.Nullable;
 
-public record PyDelegatingIterator(Iterator<? extends PyObject> delegate) implements PyIterator {
+public record PyDelegatingIterator(Iterator<? extends PyObject> delegate) implements PyObject, PyIterator {
     @Override
     public @Nullable PyObject pyNext() {
         if (delegate.hasNext()) {
