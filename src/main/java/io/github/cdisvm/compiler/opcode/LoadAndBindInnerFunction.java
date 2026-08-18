@@ -3,6 +3,7 @@ package io.github.cdisvm.compiler.opcode;
 import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.TypeKind;
 import java.util.List;
+import java.util.stream.Stream;
 
 import io.github.cdisvm.compiler.Bytecode;
 import io.github.cdisvm.compiler.CD;
@@ -26,7 +27,7 @@ import io.github.cdisvm.runtime.PyObject;
  * @param bytecode the inner function definition
  */
 public record LoadAndBindInnerFunction(Bytecode bytecode,
-                                       List<String> parametersWithDefaults) implements Opcode {
+                                       List<String> parametersWithDefaults) implements Opcode, HasCellGroup {
     @Override
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
         var functionInstance = compilationRun.compiler().compile(bytecode);
@@ -78,5 +79,20 @@ public record LoadAndBindInnerFunction(Bytecode bytecode,
                     "set$Default", MD.of(void.class, PyObject[].class, int[].class));
             codeBuilder.aload(compilationRun.getWorkSlot(0));
         }
+    }
+
+    @Override
+    public Stream<String> getCells() {
+        return bytecode.instructions()
+                .stream()
+                .flatMap(instruction -> {
+                    if (instruction.opcode() instanceof HasCell cell) {
+                        return Stream.of(cell.getVariableName());
+                    } else if (instruction.opcode() instanceof HasCellGroup cellGroup) {
+                        return cellGroup.getCells();
+                    } else {
+                        return Stream.empty();
+                    }
+                });
     }
 }

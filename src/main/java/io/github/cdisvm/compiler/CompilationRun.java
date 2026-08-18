@@ -12,6 +12,7 @@ import java.util.Set;
 import org.jspecify.annotations.NullMarked;
 
 import io.github.cdisvm.compiler.opcode.HasCell;
+import io.github.cdisvm.compiler.opcode.HasCellGroup;
 import io.github.cdisvm.compiler.opcode.HasTarget;
 import io.github.cdisvm.compiler.opcode.HasVariable;
 import io.github.cdisvm.runtime.PyGlobal;
@@ -58,6 +59,14 @@ public record CompilationRun(CDisCompiler compiler,
             }
             if (instruction.opcode() instanceof HasCell hasCell) {
                 cellVariableNameSet.add(hasCell.getVariableName());
+            }
+        }
+
+        for (var instruction : bytecode.instructions()) {
+            if (instruction.opcode() instanceof HasCellGroup cellGroup) {
+                cellGroup.getCells()
+                        .filter(variableNameToSlot::containsKey)
+                        .forEach(cellVariableNameSet::add);
             }
         }
 

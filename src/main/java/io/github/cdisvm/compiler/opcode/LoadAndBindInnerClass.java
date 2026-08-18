@@ -1,5 +1,7 @@
 package io.github.cdisvm.compiler.opcode;
 
+import java.util.stream.Stream;
+
 import io.github.cdisvm.compiler.Bytecode;
 
 /**
@@ -15,5 +17,19 @@ import io.github.cdisvm.compiler.Bytecode;
  * @param classBodyBytecode the bytecode for the class body
  */
 public record LoadAndBindInnerClass(String className,
-                                    Bytecode classBodyBytecode) implements Opcode {
+                                    Bytecode classBodyBytecode) implements Opcode, HasCellGroup {
+    @Override
+    public Stream<String> getCells() {
+        return classBodyBytecode.instructions()
+                .stream()
+                .flatMap(instruction -> {
+                    if (instruction.opcode() instanceof HasCell cell) {
+                        return Stream.of(cell.getVariableName());
+                    } else if (instruction.opcode() instanceof HasCellGroup cellGroup) {
+                        return cellGroup.getCells();
+                    } else {
+                        return Stream.empty();
+                    }
+                });
+    }
 }
