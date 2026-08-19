@@ -1,6 +1,7 @@
 import jpype
 import jpype.imports
 import inspect
+from types import ModuleType
 
 from cdis.compiler._api import to_bytecode, Bytecode
 import cdis.opcode as opcode
@@ -18,6 +19,36 @@ def _jclass(name):
 
 def _jpackage(name):
     return jpype.JPackage(name)
+
+
+def _convert_module_as_class_info(module: ModuleType, visited: set):
+    if id(module) in visited:
+        return None
+
+    visited.add(id(module))
+    JClassInfo = _jclass("io.github.cdisvm.compiler.ClassInfo")
+    JHashMap = _jclass("java.util.HashMap")
+    class_attribute_to_type = JHashMap()
+    instance_attribute_to_type = JHashMap()
+    class_attribute_to_default = JHashMap()
+
+    for module_field, value in module.__dict__.items():
+        if module_field.startswith("_"):
+            continue
+        try:
+            class_attribute_to_default.put(module_field, _convert_py_constant(value, visited))
+            class_attribute_to_type.put(module_field, _convert_py_constant(object, visited))
+        except Exception:
+            continue
+
+    return JClassInfo(
+        module.__name__,
+        module.__name__,
+        class_attribute_to_type,
+        instance_attribute_to_type,
+        class_attribute_to_default
+    )
+
 
 def _convert_class_info(cls: type, visited):
     if id(cls) in visited:
@@ -138,7 +169,10 @@ def _convert_py_constant(value, visited=None):
         cls_info = _convert_class_info(value, visited)
         out = compiler.lookupUserType(cls_info)
         return out
-
+    if isinstance(value, ModuleType):
+        cls_info = _convert_module_as_class_info(value, visited)
+        out = compiler.lookupUserType(cls_info)
+        return out
     if isinstance(value, FunctionType):
         return compile_function(value)
 
@@ -171,7 +205,7 @@ def _convert_format_conversion(conv):
     return getattr(JFormatConversion, conv.name)
 
 
-def _convert_opcode(op, outer_closure):
+def _convert_opcode(bytecode, op, outer_closure):
     O = _jpackage("io.github.cdisvm.compiler.opcode")
 
     if isinstance(op, opcode.LoadConstant):
@@ -179,7 +213,9 @@ def _convert_opcode(op, outer_closure):
     if isinstance(op, opcode.Nop):
         return O.Nop()
     if isinstance(op, opcode.ImportModule):
-        return O.ImportModule(op.name, op.level, _py_tuple_to_java(op.from_list))
+        module = __import__(op.name, bytecode.globals, bytecode.globals, op.from_list, op.level)
+        class_info = _convert_module_as_class_info(module, set())
+        return O.ImportModule(class_info)
     if isinstance(op, opcode.LoadGlobal):
         return O.LoadGlobal(op.name)
     if isinstance(op, opcode.LoadLocal):
@@ -331,11 +367,11 @@ def _convert_opcode(op, outer_closure):
     if isinstance(op, opcode.LoadAndBindInnerGenerator):
         return O.LoadAndBindInnerGenerator(_convert_cdis_class_info(op.inner_generator, outer_closure))
     if isinstance(op, opcode.SaveGeneratorState):
-        return O.SaveGeneratorState(op.state_id, _convert_stack_metadata(op.stack_metadata, outer_closure))
+        return O.SaveGeneratorState(op.state_id, _convert_stack_metadata(bytecode, op.stack_metadata, outer_closure))
     if isinstance(op, opcode.SetGeneratorDelegate):
         return O.SetGeneratorDelegate()
     if isinstance(op, opcode.DelegateOrRestoreGeneratorState):
-        return O.DelegateOrRestoreGeneratorState(op.state_id, _convert_stack_metadata(op.stack_metadata, outer_closure))
+        return O.DelegateOrRestoreGeneratorState(op.state_id, _convert_stack_metadata(bytecode, op.stack_metadata, outer_closure))
     if isinstance(op, opcode.YieldValue):
         return O.YieldValue()
     if isinstance(op, opcode.LoadTypeAttrOrGlobal):
@@ -348,26 +384,26 @@ def _convert_opcode(op, outer_closure):
     raise ValueError(f"Unknown opcode type: {type(op)}")
 
 
-def _convert_instruction(instr, outer_closure):
+def _convert_instruction(bytecode, instr, outer_closure):
     JInstruction = _jclass("io.github.cdisvm.compiler.Instruction")
-    return JInstruction(_convert_opcode(instr.opcode, outer_closure), instr.bytecode_index, instr.lineno)
+    return JInstruction(_convert_opcode(bytecode, instr.opcode, outer_closure), instr.bytecode_index, instr.lineno)
 
 
-def _convert_value_source(vs, outer_closure):
+def _convert_value_source(bc, vs, outer_closure):
     JValueSource = _jclass("io.github.cdisvm.compiler.ValueSource")
-    sources = _py_list_to_java([_convert_instruction(i, outer_closure) for i in vs.sources])
+    sources = _py_list_to_java([_convert_instruction(bc, i, outer_closure) for i in vs.sources])
     PyType = _jclass("io.github.cdisvm.runtime.PyType")
     PyObject = _jclass("io.github.cdisvm.runtime.PyObject")
     return JValueSource(sources, PyType.of(PyObject))
 
 
-def _convert_stack_metadata(sm, outer_closure):
+def _convert_stack_metadata(bc, sm, outer_closure):
     JStackMetadata = _jclass("io.github.cdisvm.compiler.StackMetadata")
-    stack = _py_list_to_java([_convert_value_source(v, outer_closure) for v in sm.stack])
+    stack = _py_list_to_java([_convert_value_source(bc, v, outer_closure) for v in sm.stack])
     local_vars = _jclass("java.util.HashMap")()
     for k, v in sm.variables.items():
-        local_vars.put(k, _convert_value_source(v, outer_closure))
-    synthetics = _py_list_to_java([_convert_value_source(v, outer_closure) for v in sm.synthetic_variables])
+        local_vars.put(k, _convert_value_source(bc, v, outer_closure))
+    synthetics = _py_list_to_java([_convert_value_source(bc, v, outer_closure) for v in sm.synthetic_variables])
     return JStackMetadata(stack, local_vars, synthetics, sm.dead)
 
 
@@ -465,8 +501,8 @@ def _convert_bytecode(bc, outer_closure=None):
     else:
         closure = outer_closure
 
-    instructions = _py_list_to_java([_convert_instruction(i, closure) for i in bc.instructions])
-    stack_metadata = _py_list_to_java([_convert_stack_metadata(s, closure) for s in bc.stack_metadata])
+    instructions = _py_list_to_java([_convert_instruction(bc, i, closure) for i in bc.instructions])
+    stack_metadata = _py_list_to_java([_convert_stack_metadata(bc, s, closure) for s in bc.stack_metadata])
     exception_handlers = _py_list_to_java([_convert_exception_handler(e) for e in bc.exception_handlers])
 
     annotate_function = None

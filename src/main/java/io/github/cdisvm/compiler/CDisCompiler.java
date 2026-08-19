@@ -1038,6 +1038,16 @@ public class CDisCompiler {
                 codeBuilder.athrow();
 
                 codeBuilder.labelBinding(codeStartLabel);
+                // Need to assign variables to null in case the Python code tries to access
+                // them before they are definitely assigned.
+                for (var variableEntry : compileRun.variableNameToSlot().entrySet()) {
+                    if (compileRun.isCell(variableEntry.getKey()) || bytecode.signature().parameters()
+                            .stream().anyMatch(parameter -> parameter.parameterName().equals(variableEntry.getKey()))) {
+                        continue;
+                    }
+                    codeBuilder.aconst_null();
+                    codeBuilder.astore(compileRun.getVariableSlot(variableEntry.getKey()));
+                }
                 for (var i = 0; i < compileRun.syntheticCount(); i++) {
                     codeBuilder.aconst_null();
                     codeBuilder.astore(compileRun.getSyntheticSlot(i));

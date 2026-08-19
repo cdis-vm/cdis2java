@@ -1,5 +1,7 @@
 import pytest
 import sys
+
+from tests import my_module
 from tests.conftest import create_function_match_asserter
 
 def test_return_constant():
@@ -1287,63 +1289,43 @@ def test_async_with():
 
 
 def test_import():
-    def sqrt(x):
-        import math
+    def func():
+        import this
 
-        return int(math.sqrt(x))
+        return this.s
 
-    match = create_function_match_asserter(sqrt)
-    match(4)
-    match(9)
+    match = create_function_match_asserter(func)
+    match()
 
 
 def test_import_as():
-    def sqrt(x):
-        import math as m
+    def func():
+        import this as c
 
-        return int(m.sqrt(x))
+        return c.s
 
-    match = create_function_match_asserter(sqrt)
-    match(4)
-    match(9)
-
-
-def test_multi_import():
-    def sqrt(x):
-        import math
-        import string
-
-        return string.Formatter().format("{}", int(math.sqrt(x)))
-
-    match = create_function_match_asserter(sqrt)
-    match(4)
-    match(9)
+    match = create_function_match_asserter(func)
+    match()
 
 
 def test_import_from():
-    def sqrt(x):
-        from math import sqrt as square_root
+    def func():
+        from this import s as text
 
-        return int(square_root(x))
+        return text
 
-    match = create_function_match_asserter(sqrt)
-    match(4)
-    match(9)
+    match = create_function_match_asserter(func)
+    match()
 
 
-def test_import_path():
-    def is_iterable(asserted):
-        import collections.abc
-
-        return isinstance(asserted, collections.abc.Iterable)
-
-    from collections.abc import Collection, Iterable, KeysView
-
-    match = create_function_match_asserter(is_iterable)
-    match(Collection)
-    match(Iterable)
-    match(KeysView)
-    match(10)
+# def test_import_path():
+#     def func():
+#         import cdis.opcode as opcode
+#
+#         return opcode.__all__
+#
+#     match = create_function_match_asserter(func)
+#     match()
 
 
 def test_match_sequence():

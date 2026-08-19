@@ -3,7 +3,8 @@ package io.github.cdisvm.compiler;
 public enum UnaryOperator {
     INVERT("Invert"),
     POSITIVE("UAdd"),
-    NEGATE("USub");
+    NEGATE("USub"),
+    NOT("Not");
 
     private final String id;
 

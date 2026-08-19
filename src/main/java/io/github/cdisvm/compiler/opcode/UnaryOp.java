@@ -7,7 +7,6 @@ import io.github.cdisvm.compiler.CompilationRun;
 import io.github.cdisvm.compiler.MD;
 import io.github.cdisvm.compiler.StackMetadata;
 import io.github.cdisvm.compiler.UnaryOperator;
-import io.github.cdisvm.runtime.PyContainer;
 import io.github.cdisvm.runtime.PyHasPos;
 import io.github.cdisvm.runtime.PyInvertible;
 import io.github.cdisvm.runtime.PyNegatable;
@@ -44,6 +43,10 @@ public record UnaryOp(UnaryOperator operator) implements Opcode {
             case NEGATE -> {
                 codeBuilder.invokestatic(CD.of(PyNegatable.class), "wrapping", MD.of(PyNegatable.class, PyObject.class), true);
                 codeBuilder.invokeinterface(CD.of(PyNegatable.class), "pyNegate", MD.of(PyObject.class));
+            }
+            case NOT -> {
+                codeBuilder.invokeinterface(CD.PY_OBJECT, "pyTruth", MD.of(PyBool.class));
+                codeBuilder.invokevirtual(CD.of(PyBool.class), "negate", MD.of(PyBool.class));
             }
         }
     }
