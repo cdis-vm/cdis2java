@@ -2,6 +2,7 @@ package io.github.cdisvm.compiler.opcode;
 
 import java.lang.classfile.CodeBuilder;
 
+import io.github.cdisvm.compiler.CD;
 import io.github.cdisvm.compiler.CompilationRun;
 import io.github.cdisvm.compiler.MD;
 import io.github.cdisvm.compiler.StackMetadata;
@@ -31,10 +32,29 @@ public record WithKeywordArg(String argumentName) implements Opcode {
     public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
         var interfaceCD = compilationRun.compiler().getFunctionParameterByNameClassDesc(argumentName);
         codeBuilder.swap();
+        codeBuilder.dup();
+        codeBuilder.instanceOf(interfaceCD);
+        var doesNotHaveKeywordArgInterface = codeBuilder.newLabel();
+        var done = codeBuilder.newLabel();
+        codeBuilder.ifeq(doesNotHaveKeywordArgInterface);
+
+        // Has interface, use it
         codeBuilder.checkcast(interfaceCD);
         codeBuilder.swap();
         codeBuilder.invokeinterface(interfaceCD,
                 argumentName,
                 MD.of(PyCallBuilder.class, PyObject.class));
+        codeBuilder.goto_(done);
+
+        codeBuilder.labelBinding(doesNotHaveKeywordArgInterface);
+        // Does not have interface, need to use $putArgument
+        codeBuilder.swap();
+        codeBuilder.loadConstant(argumentName);
+        codeBuilder.swap();
+        codeBuilder.invokeinterface(CD.PY_CALL_BUILDER,
+                "$putArgument",
+                MD.of(PyCallBuilder.class, String.class, PyObject.class));
+
+        codeBuilder.labelBinding(done);
     }
 }

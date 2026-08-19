@@ -13,12 +13,14 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -35,6 +37,7 @@ import io.github.cdisvm.runtime.PyGlobal;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.builtin.PyStr;
 import io.github.cdisvm.runtime.descriptor.PyGetDescriptor;
 import io.github.cdisvm.runtime.exception.PyBaseException;
 
@@ -267,7 +270,11 @@ public class CDisCompiler {
             classBuilder.withInterfaceSymbols(interfaces);
 
             for (var parameter : signature.parameters()) {
-                classBuilder.withField(parameter.parameterName(), CD.PY_OBJECT, Modifier.PUBLIC);
+                switch (parameter.parameterKind()) {
+                    case VARGS -> classBuilder.withField(parameter.parameterName(), CD.LIST, Modifier.PUBLIC);
+                    case KWARGS -> classBuilder.withField(parameter.parameterName(), CD.of(SequencedMap.class), Modifier.PUBLIC);
+                    default -> classBuilder.withField(parameter.parameterName(), CD.PY_OBJECT, Modifier.PUBLIC);
+                }
                 if (parameter.defaultValue() != null) {
                     classBuilder.withField(parameter.parameterName() + "$Default", CD.PY_OBJECT, Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
                 }
@@ -317,6 +324,19 @@ public class CDisCompiler {
                         codeBuilder.aload(0);
                         codeBuilder.getstatic(callBuilderClassDesc, parameter.parameterName() + "$Default", CD.PY_OBJECT);
                         codeBuilder.putfield(callBuilderClassDesc, parameter.parameterName(), CD.PY_OBJECT);
+                    }
+                    if (parameter.parameterKind() == ParameterKind.VARGS) {
+                        codeBuilder.aload(0);
+                        codeBuilder.new_(CD.of(ArrayList.class));
+                        codeBuilder.dup();
+                        codeBuilder.invokespecial(CD.of(ArrayList.class), "<init>", MD.of(void.class));
+                        codeBuilder.putfield(callBuilderClassDesc, parameter.parameterName(), CD.LIST);
+                    } else if (parameter.parameterKind() == ParameterKind.KWARGS) {
+                        codeBuilder.aload(0);
+                        codeBuilder.new_(CD.of(LinkedHashMap.class));
+                        codeBuilder.dup();
+                        codeBuilder.invokespecial(CD.of(LinkedHashMap.class), "<init>", MD.of(void.class));
+                        codeBuilder.putfield(callBuilderClassDesc, parameter.parameterName(), CD.of(SequencedMap.class));
                     }
                 }
                 codeBuilder.return_();
@@ -549,7 +569,11 @@ public class CDisCompiler {
                         CD.VOID));
                 codeBuilder.athrow();
             } else {
-                // TODO: Vargs handling
+                codeBuilder.aload(0);
+                codeBuilder.getfield(callBuilderClassDesc, vargsParameter.parameterName(), CD.LIST);
+                codeBuilder.aload(1);
+                codeBuilder.invokeinterface(CD.LIST, "add", MD.of(boolean.class, Object.class));
+                codeBuilder.pop();
             }
 
 
@@ -620,7 +644,15 @@ public class CDisCompiler {
                         CD.VOID));
                 codeBuilder.athrow();
             } else {
-                // TODO: Kwargs handling
+                codeBuilder.aload(0);
+                codeBuilder.getfield(callBuilderClassDesc, kwargsParameter.parameterName(), CD.of(SequencedMap.class));
+                codeBuilder.new_(CD.of(PyStr.class));
+                codeBuilder.dup();
+                codeBuilder.aload(1);
+                codeBuilder.invokespecial(CD.of(PyStr.class), "<init>", MD.of(void.class, String.class));
+                codeBuilder.aload(2);
+                codeBuilder.invokeinterface(CD.of(SequencedMap.class), "put", MD.of(Object.class, Object.class, Object.class));
+                codeBuilder.pop();
             }
 
 
@@ -647,36 +679,19 @@ public class CDisCompiler {
     }
 
     private List<ClassDesc> createSignatureParameterInterface(FunctionParameter parameter) {
-        var positionalInterface = FunctionSignature.getPositionalArgumentInterfaceName(parameter.parameterIndex());
         var keywordInterface = FunctionSignature.getKeywordArgumentInterfaceName(parameter.parameterName());
 
         return switch (parameter.parameterKind()) {
-            case POSITIONAL_OR_KEYWORD -> {
-                if (!classLoader.isClassDefined(positionalInterface)) {
-                    defineSignaturePositionalInterface(positionalInterface, parameter.parameterIndex());
-                }
-                if (!classLoader.isClassDefined(keywordInterface)) {
-                    defineSignatureKeywordInterface(keywordInterface, parameter.parameterName());
-                }
-                yield List.of(ClassDesc.of(positionalInterface),
-                        ClassDesc.of(keywordInterface));
-            }
-            case POSITIONAL_ONLY -> {
-                if (!classLoader.isClassDefined(positionalInterface)) {
-                    defineSignaturePositionalInterface(positionalInterface, parameter.parameterIndex());
-                }
-                yield List.of(ClassDesc.of(positionalInterface));
-            }
-            case KEYWORD_ONLY -> {
+            case POSITIONAL_OR_KEYWORD, KEYWORD_ONLY -> {
                 if (!classLoader.isClassDefined(keywordInterface)) {
                     defineSignatureKeywordInterface(keywordInterface, parameter.parameterName());
                 }
                 yield List.of(ClassDesc.of(keywordInterface));
             }
-            case VARGS, KWARGS ->
-                // VARGS/KWARGS don't contribute additional interfaces;
+            case VARGS, KWARGS, POSITIONAL_ONLY ->
+                // POSITIONAL_ONLY/VARGS/KWARGS don't contribute additional interfaces;
                 // they use the $ methods of PyCallBuilder
-                    Collections.emptyList();
+                Collections.emptyList();
         };
     }
 
@@ -976,12 +991,32 @@ public class CDisCompiler {
                 }
 
                 for (var parameter : bytecode.signature().parameters()) {
-                    codeBuilder.aload(2);
-                    codeBuilder.getfield(callBuilderClassDescriptor, parameter.parameterName(), CD.PY_OBJECT);
-                    if (parameter.defaultValue() == null) {
+                    if (parameter.parameterKind() == ParameterKind.VARGS) {
+                        codeBuilder.new_(CD.PY_TUPLE);
                         codeBuilder.dup();
-                        codeBuilder.aconst_null();
-                        codeBuilder.if_acmpeq(invalidArgumentsLabel);
+                        codeBuilder.aload(2);
+                        codeBuilder.getfield(callBuilderClassDescriptor, parameter.parameterName(), CD.LIST);
+                        codeBuilder.invokespecial(CD.PY_TUPLE, "<init>", MethodTypeDesc.of(CD.VOID, CD.LIST));
+                    } else if (parameter.parameterKind() == ParameterKind.KWARGS) {
+                        codeBuilder.new_(CD.PY_DICT);
+                        codeBuilder.dup();
+                        codeBuilder.aload(2);
+                        codeBuilder.getfield(callBuilderClassDescriptor, parameter.parameterName(), CD.of(SequencedMap.class));
+                        codeBuilder.invokespecial(CD.PY_DICT, "<init>", MethodTypeDesc.of(CD.VOID, CD.of(SequencedMap.class)));
+                    } else {
+                        codeBuilder.aload(2);
+                        codeBuilder.getfield(callBuilderClassDescriptor, parameter.parameterName(), CD.PY_OBJECT);
+                    }
+
+                    switch (parameter.parameterKind()) {
+                        case VARGS, KWARGS -> { /* cannot be null */ }
+                        default -> {
+                            if (parameter.defaultValue() == null) {
+                                codeBuilder.dup();
+                                codeBuilder.aconst_null();
+                                codeBuilder.if_acmpeq(invalidArgumentsLabel);
+                            }
+                        }
                     }
                     var slot = compileRun.getVariableSlot(parameter.parameterName());
                     if (compileRun.isCell(parameter.parameterName())) {

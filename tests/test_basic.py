@@ -875,6 +875,31 @@ def test_inner_function():
     match(3)
 
 
+def test_inner_function_vargs():
+    def outer_function(*args):
+        def inner_function(a, b, *c):
+            return a, b, c
+
+        return inner_function(args[0], args[1], *args[2:])
+
+    match = create_function_match_asserter(outer_function)
+    match(1, 2)
+    match(1, 2, 3)
+    match(1, 2, 3, 4)
+
+
+def test_inner_function_kwargs():
+    def outer_function(a, b):
+        def inner_function(**kwargs):
+            return kwargs
+
+        return inner_function(a=a, **b)
+
+    match = create_function_match_asserter(outer_function)
+    match(1, {})
+    match(2, {'c': 3})
+
+
 def test_inner_function_with_defaults():
     def outer_function(x):
         def inner_function(y=x * 2):
