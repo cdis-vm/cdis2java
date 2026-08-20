@@ -1,7 +1,6 @@
 import pytest
 import sys
 
-from tests import my_module
 from tests.conftest import create_function_match_asserter
 
 def test_return_constant():
