@@ -16,13 +16,14 @@ import io.github.cdisvm.runtime.PyIndexable;
 import io.github.cdisvm.runtime.PyIterable;
 import io.github.cdisvm.runtime.PyIterator;
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.PySequence;
 import io.github.cdisvm.runtime.PySizable;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.exception.PyIndexError;
 
 @NullMarked
 public abstract class PySequenceBase<T extends PyObject> implements PyObject, PyGettable, PyContainer,
-        PySizable, PyIterable, List<T> {
+        PySizable, PyIterable, PySequence, List<T> {
     final List<T> delegate;
 
     public PySequenceBase() {

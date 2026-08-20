@@ -12,8 +12,11 @@ import io.github.cdisvm.compiler.CDisCompiler;
 import io.github.cdisvm.compiler.MD;
 import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyContainer;
+import io.github.cdisvm.runtime.PyDelegatingIterator;
 import io.github.cdisvm.runtime.PyDeletable;
 import io.github.cdisvm.runtime.PyGettable;
+import io.github.cdisvm.runtime.PyIterator;
+import io.github.cdisvm.runtime.PyMapping;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PySettable;
 import io.github.cdisvm.runtime.PySizable;
@@ -25,7 +28,7 @@ import io.github.cdisvm.runtime.exception.PyKeyError;
 @PyBuiltin("dict")
 public record PyDict<Key_ extends PyObject, Value_ extends PyObject>(SequencedMap<Key_, Value_> delegate) implements
         PyObject, PySizable, PyContainer, PyGettable, PySettable, PyDeletable, SequencedMap<Key_, Value_>,
-        PyConstant {
+        PyConstant, PyMapping {
     public static PyType type;
 
     @Override
@@ -174,5 +177,10 @@ public record PyDict<Key_ extends PyObject, Value_ extends PyObject>(SequencedMa
     @Override
     public Set<Entry<Key_, Value_>> entrySet() {
         return delegate.entrySet();
+    }
+
+    @Override
+    public PyIterator pyIterator() {
+        return new PyDelegatingIterator(delegate.keySet().iterator());
     }
 }

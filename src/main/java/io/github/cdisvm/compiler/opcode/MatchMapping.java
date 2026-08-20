@@ -1,10 +1,23 @@
 package io.github.cdisvm.compiler.opcode;
 
+import java.lang.classfile.CodeBuilder;
 import java.util.List;
 
 import org.jspecify.annotations.NullMarked;
 
+import io.github.cdisvm.compiler.CD;
+import io.github.cdisvm.compiler.CompilationRun;
+import io.github.cdisvm.compiler.MD;
+import io.github.cdisvm.compiler.StackMetadata;
+import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyContainer;
+import io.github.cdisvm.runtime.PyIterable;
+import io.github.cdisvm.runtime.PyMapping;
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.PySizable;
+import io.github.cdisvm.runtime.builtin.PyBool;
+import io.github.cdisvm.runtime.builtin.PyInt;
+import io.github.cdisvm.runtime.builtin.PySequenceBase;
 
 /**
  * Top of stack is the queried object.
@@ -35,10 +48,29 @@ import io.github.cdisvm.runtime.PyObject;
  * @param targetBytecodeIndex where to jump if the mapping does not contain the keys
  */
 @NullMarked
-public record MatchMapping(List<PyObject> keys,
+public record MatchMapping(List<Object> keys,
                            int targetBytecodeIndex) implements Opcode, HasTarget {
     @Override
     public int getTargetBytecodeIndex() {
         return targetBytecodeIndex;
+    }
+
+    @Override
+    public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
+        var notMatchLabel = compilationRun.bytecodeIndexToLabel().get(targetBytecodeIndex);
+        codeBuilder.dup();
+        codeBuilder.instanceOf(CD.of(PyMapping.class));
+        codeBuilder.ifeq(notMatchLabel);
+        for (var key : UnpackMapping.getPythonKeys(keys)) {
+            codeBuilder.dup();
+            if (key instanceof PyConstant pyConstant) {
+                pyConstant.loadValueOntoStack(codeBuilder);
+            } else {
+                throw new IllegalArgumentException("key (%s) is not a constant".formatted(key));
+            }
+            codeBuilder.invokeinterface(CD.of(PyContainer.class), "pyHasItem", MD.of(PyBool.class, PyObject.class));
+            codeBuilder.getstatic(CD.PY_BOOL, "TRUE", CD.PY_BOOL);
+            codeBuilder.if_acmpne(notMatchLabel);
+        }
     }
 }

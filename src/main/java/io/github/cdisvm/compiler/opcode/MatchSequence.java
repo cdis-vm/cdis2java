@@ -1,5 +1,16 @@
 package io.github.cdisvm.compiler.opcode;
 
+import java.lang.classfile.CodeBuilder;
+
+import io.github.cdisvm.compiler.CD;
+import io.github.cdisvm.compiler.CompilationRun;
+import io.github.cdisvm.compiler.MD;
+import io.github.cdisvm.compiler.StackMetadata;
+import io.github.cdisvm.runtime.PySequence;
+import io.github.cdisvm.runtime.PySizable;
+import io.github.cdisvm.runtime.builtin.PyInt;
+import io.github.cdisvm.runtime.builtin.PySequenceBase;
+
 /**
  * Top of stack is the queried object.
  * <p>
@@ -36,5 +47,23 @@ public record MatchSequence(int length,
     @Override
     public int getTargetBytecodeIndex() {
         return targetBytecodeIndex;
+    }
+
+    @Override
+    public void implement(CodeBuilder codeBuilder, CompilationRun compilationRun, StackMetadata stackMetadata) {
+        var notMatchLabel = compilationRun.bytecodeIndexToLabel().get(targetBytecodeIndex);
+        codeBuilder.dup();
+        codeBuilder.instanceOf(CD.of(PySequence.class));
+        codeBuilder.ifeq(notMatchLabel);
+        codeBuilder.dup();
+        codeBuilder.checkcast(CD.of(PySizable.class));
+        codeBuilder.invokeinterface(CD.of(PySizable.class), "pyLength", MD.of(PyInt.class));
+        codeBuilder.invokevirtual(CD.of(PyInt.class), "intValue", MD.of(int.class));
+        codeBuilder.loadConstant(length);
+        if (isExact) {
+            codeBuilder.if_icmpne(notMatchLabel);
+        } else {
+            codeBuilder.if_icmplt(notMatchLabel);
+        }
     }
 }
