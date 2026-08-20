@@ -19,13 +19,14 @@ import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.binary.PyAddable;
+import io.github.cdisvm.runtime.comparison.PyHasEquals;
 import io.github.cdisvm.runtime.exception.PyTypeError;
 import io.github.cdisvm.runtime.exception.PyValueError;
 import io.github.cdisvm.runtime.util.DefaultFormatSpec;
 
 @PyBuiltin("str")
 public record PyStr(String value) implements PyConstant, PyContainer, PyAddable, PyFormattable,
-        PyAsciiable, PyGettable {
+        PyAsciiable, PyGettable, PyHasEquals {
     public static PyType type;
 
     @PyConstructor
@@ -168,6 +169,12 @@ public record PyStr(String value) implements PyConstant, PyContainer, PyAddable,
             return new PyStr(value.concat(((PyStr) other).value));
         }
         return PyNotImplemented.INSTANCE;
+    }
+
+    @Override
+    public PyObject pyEquals(PyObject o) {
+        return (o instanceof PyStr(var otherValue))? PyBool.of(value.equals(otherValue))
+                : PyNotImplemented.INSTANCE;
     }
 
     @Override
