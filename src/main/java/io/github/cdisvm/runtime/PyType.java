@@ -19,6 +19,7 @@ public interface PyType extends PyObject, PyCallable, PyConstant {
 
     boolean instanceCheck(PyObject instance);
     boolean subclassCheck(PyType clazz);
+    PyObject newInstance();
 
     default void loadValueOntoStack(CodeBuilder codeBuilder) {
         codeBuilder.getstatic(CD.of(getClass()), "INSTANCE", CD.of(getClass()));

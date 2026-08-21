@@ -208,6 +208,16 @@ public class PyTypeCompiler {
                 codeBuilder.areturn();
             });
 
+            classBuilder.withMethodBody("newInstance", MD.of(PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(0);
+                codeBuilder.new_(constructorCD);
+                codeBuilder.dup();
+                codeBuilder.invokespecial(constructorCD, "<init>", MD.of(void.class));
+                codeBuilder.invokeinterface(CD.PY_CALLABLE, "pyCallBuilder", MD.of(PyCallBuilder.class));
+                codeBuilder.invokevirtual(classDesc, "pyCall", MD.of(PyObject.class, PyCallBuilder.class));
+                codeBuilder.areturn();
+            });
+
             classBuilder.withMethodBody("mro", MD.of(List.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.getstatic(classDesc, "MRO", CD.of(List.class));
                 codeBuilder.areturn();
@@ -330,6 +340,13 @@ public class PyTypeCompiler {
             classBuilder.withMethodBody("pyCall", MD.of(PyObject.class, PyCallBuilder.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(1);
                 codeBuilder.invokeinterface(CD.of(PyCallBuilder.class), "pyCall", MD.of(PyObject.class));
+                codeBuilder.areturn();
+            });
+
+            classBuilder.withMethodBody("newInstance", MD.of(PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.new_(instanceClassDesc);
+                codeBuilder.dup();
+                codeBuilder.invokespecial(instanceClassDesc, "<init>", MD.of(void.class));
                 codeBuilder.areturn();
             });
 

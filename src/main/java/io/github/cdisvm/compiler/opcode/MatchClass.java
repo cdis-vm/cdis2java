@@ -134,10 +134,10 @@ public record MatchClass(List<String> attributes,
             raiseAcceptsPositionals(codeBuilder, typeSlot, 0);
 
             codeBuilder.labelBinding(haveMatchArgsLabel);
+            codeBuilder.loadConstant(positionalCount);
             codeBuilder.aload(matchArgsSlot);
             codeBuilder.checkcast(CD.PY_TUPLE);
             codeBuilder.invokevirtual(CD.PY_TUPLE, "size", MD.of(int.class));
-            codeBuilder.loadConstant(positionalCount);
             var countOkLabel = codeBuilder.newLabel();
             codeBuilder.if_icmple(countOkLabel);
             raiseAcceptsMatchArgsSizePositionals(codeBuilder, typeSlot, matchArgsSlot);

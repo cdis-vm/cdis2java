@@ -44,6 +44,12 @@ public final class PyTypeType implements PyType, PyConstant {
     }
 
     @Override
+    public PyObject newInstance() {
+        // TODO
+        return null;
+    }
+
+    @Override
     public PyObject pyCall(PyCallBuilder callBuilder) {
         // TODO
         return null;

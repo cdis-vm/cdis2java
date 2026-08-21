@@ -38,6 +38,11 @@ public final class PyObjectType implements PyType, PyConstant {
     }
 
     @Override
+    public PyObject newInstance() {
+        return pyCallBuilder().pyCall();
+    }
+
+    @Override
     public PyCallBuilder pyCallBuilder() {
         return new PyCallBuilder() {
             @Override
