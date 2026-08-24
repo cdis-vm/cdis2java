@@ -1,9 +1,6 @@
 package io.github.cdisvm.compiler;
 
-import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.CodeBuilder;
-import java.lang.classfile.MethodBuilder;
-import java.lang.classfile.instruction.SwitchCase;
 import java.lang.constant.ClassDesc;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -80,6 +77,21 @@ public class PyTypeCompiler {
             return qualifiedNameToMarkerInterfaceDesc.get(sanitizedName);
         }
         var interfaceName = cDisCompiler.createClass("%sMarker".formatted(sanitizedName), (classDesc, classBuilder) -> {
+            classBuilder.withFlags(Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE);
+            // TODO: Bases
+        });
+        var interfaceDesc = ClassDesc.of(interfaceName);
+        qualifiedNameToMarkerInterfaceDesc.put(qualifiedName, interfaceDesc);
+        return interfaceDesc;
+    }
+
+    private ClassDesc getTypeMarkerInterfaceDesc(String qualifiedName) {
+        // Can reuse same map; Python classes cannot use "$"
+        var sanitizedName = CDisCompiler.arbitraryTextToJavaIdentifierName(qualifiedName + "$Type");
+        if (qualifiedNameToMarkerInterfaceDesc.containsKey(sanitizedName)) {
+            return qualifiedNameToMarkerInterfaceDesc.get(sanitizedName);
+        }
+        var interfaceName = cDisCompiler.createClass("%s$TypeMarker".formatted(sanitizedName), (classDesc, classBuilder) -> {
             classBuilder.withFlags(Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE);
             // TODO: Bases
         });
@@ -266,9 +278,9 @@ public class PyTypeCompiler {
             return classInfoToCompiledUserType.get(classInfo);
         }
         var createdClass = cDisCompiler.createClass(classInfo.simpleName() + "Type", (classDesc, classBuilder) -> {
-            var markerInterfaceCD = getMarkerInterfaceDesc(classInfo.qualifiedName());
+            var typeMarkerInterfaceCD = getTypeMarkerInterfaceDesc(classInfo.qualifiedName());
             classBuilder.withInterfaceSymbols(CD.of(PyType.class), CD.of(PyObject.class), CD.of(PyCallable.class),
-                    markerInterfaceCD);
+                    typeMarkerInterfaceCD);
 
             var attributeClass = createTypeAttributes(classInfo);
             var instanceClassDesc = compileUserTypeInstance(classInfo, classDesc, ClassDesc.of(attributeClass));
@@ -363,13 +375,13 @@ public class PyTypeCompiler {
             classBuilder.withMethodBody("instanceCheck", MD.of(boolean.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(1);
                 codeBuilder.invokeinterface(CD.PY_OBJECT, "pyType", MD.of(PyType.class));
-                codeBuilder.instanceOf(markerInterfaceCD);
+                codeBuilder.instanceOf(typeMarkerInterfaceCD);
                 codeBuilder.ireturn();
             });
 
             classBuilder.withMethodBody("subclassCheck", MD.of(boolean.class, PyType.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(1);
-                codeBuilder.instanceOf(markerInterfaceCD);
+                codeBuilder.instanceOf(typeMarkerInterfaceCD);
                 codeBuilder.ireturn();
             });
 
