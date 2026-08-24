@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import io.github.cdisvm.runtime.PyAttributes;
@@ -47,14 +48,14 @@ public class PyTypeCompiler {
 
     public PyTypeCompiler(CDisCompiler cDisCompiler) {
         this.cDisCompiler = cDisCompiler;
-        classToCompiledType = new LinkedHashMap<>();
-        classToMarkerInterfaceDesc = new LinkedHashMap<>();
-        attributeNameToAttributeDesc = new LinkedHashMap<>();
-        classInfoToCompiledUserType = new LinkedHashMap<>();
-        qualifiedNameToMarkerInterfaceDesc = new LinkedHashMap<>();
+        classToCompiledType = new ConcurrentHashMap<>();
+        classToMarkerInterfaceDesc = new ConcurrentHashMap<>();
+        attributeNameToAttributeDesc = new ConcurrentHashMap<>();
+        classInfoToCompiledUserType = new ConcurrentHashMap<>();
+        qualifiedNameToMarkerInterfaceDesc = new ConcurrentHashMap<>();
     }
 
-    private ClassDesc getMarkerInterfaceDesc(Class<?> sourceClass) {
+    private ClassDesc getBuiltinMarkerInterfaceDesc(Class<?> sourceClass) {
         if (classToMarkerInterfaceDesc.containsKey(sourceClass)) {
             return classToMarkerInterfaceDesc.get(sourceClass);
         }
@@ -62,7 +63,7 @@ public class PyTypeCompiler {
             classBuilder.withFlags(Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE);
             var superInterfaces = new ArrayList<ClassDesc>();
             if (PyObject.class.isAssignableFrom(sourceClass.getSuperclass())) {
-                superInterfaces.add(getMarkerInterfaceDesc(sourceClass.getSuperclass()));
+                superInterfaces.add(getBuiltinMarkerInterfaceDesc(sourceClass.getSuperclass()));
             }
             classBuilder.withInterfaceSymbols(superInterfaces);
         });
@@ -71,32 +72,32 @@ public class PyTypeCompiler {
         return interfaceDesc;
     }
 
-    private ClassDesc getMarkerInterfaceDesc(String qualifiedName) {
-        var sanitizedName = CDisCompiler.arbitraryTextToJavaIdentifierName(qualifiedName);
-        if (qualifiedNameToMarkerInterfaceDesc.containsKey(sanitizedName)) {
-            return qualifiedNameToMarkerInterfaceDesc.get(sanitizedName);
+    private ClassDesc getUserMarkerInterfaceDesc(ClassInfo classInfo, Consumer<UserTypeCustomizer> customizerConsumer) {
+        if (qualifiedNameToMarkerInterfaceDesc.containsKey(classInfo.qualifiedName())) {
+            return qualifiedNameToMarkerInterfaceDesc.get(classInfo.qualifiedName());
         }
-        var interfaceName = cDisCompiler.createClass("%sMarker".formatted(sanitizedName), (classDesc, classBuilder) -> {
+        var interfaceName = cDisCompiler.createUserClass("%sMarker".formatted(classInfo.qualifiedName()), (classDesc, classBuilder) -> {
             classBuilder.withFlags(Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE);
             // TODO: Bases
+            var customizer = new UserTypeCustomizer(cDisCompiler, classBuilder, classInfo, classDesc);
+            customizerConsumer.accept(customizer);
         });
         var interfaceDesc = ClassDesc.of(interfaceName);
-        qualifiedNameToMarkerInterfaceDesc.put(qualifiedName, interfaceDesc);
+        qualifiedNameToMarkerInterfaceDesc.put(classInfo.qualifiedName(), interfaceDesc);
         return interfaceDesc;
     }
 
     private ClassDesc getTypeMarkerInterfaceDesc(String qualifiedName) {
         // Can reuse same map; Python classes cannot use "$"
-        var sanitizedName = CDisCompiler.arbitraryTextToJavaIdentifierName(qualifiedName + "$Type");
-        if (qualifiedNameToMarkerInterfaceDesc.containsKey(sanitizedName)) {
-            return qualifiedNameToMarkerInterfaceDesc.get(sanitizedName);
+        if (qualifiedNameToMarkerInterfaceDesc.containsKey(qualifiedName + "$TypeMarker")) {
+            return qualifiedNameToMarkerInterfaceDesc.get(qualifiedName + "$TypeMarker");
         }
-        var interfaceName = cDisCompiler.createClass("%s$TypeMarker".formatted(sanitizedName), (classDesc, classBuilder) -> {
+        var interfaceName = cDisCompiler.createUserClass("%s$TypeMarker".formatted(qualifiedName), (classDesc, classBuilder) -> {
             classBuilder.withFlags(Modifier.PUBLIC | Modifier.ABSTRACT | Modifier.INTERFACE);
             // TODO: Bases
         });
         var interfaceDesc = ClassDesc.of(interfaceName);
-        qualifiedNameToMarkerInterfaceDesc.put(qualifiedName, interfaceDesc);
+        qualifiedNameToMarkerInterfaceDesc.put(qualifiedName + "$TypeMarker", interfaceDesc);
         return interfaceDesc;
     }
 
@@ -170,7 +171,7 @@ public class PyTypeCompiler {
         }));
         var constructorCD = CD.of(constructorCallable.getClass());
         var createdClass = cDisCompiler.createClass(builtinClass.getSimpleName() + "Type", (classDesc, classBuilder) -> {
-            var markerInterfaceCD = getMarkerInterfaceDesc(builtinClass);
+            var markerInterfaceCD = getBuiltinMarkerInterfaceDesc(builtinClass);
             classBuilder.withInterfaceSymbols(CD.of(PyType.class), CD.of(PyObject.class), CD.of(PyCallable.class),
                     markerInterfaceCD);
             classBuilder.withField("INSTANCE", classDesc, Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
@@ -273,7 +274,7 @@ public class PyTypeCompiler {
         }
     }
 
-    public PyType compileUserType(ClassInfo classInfo) {
+    public PyType compileUserType(ClassInfo classInfo, Consumer<UserTypeCustomizer> customizerConsumer) {
         if (classInfoToCompiledUserType.containsKey(classInfo)) {
             return classInfoToCompiledUserType.get(classInfo);
         }
@@ -283,7 +284,10 @@ public class PyTypeCompiler {
                     typeMarkerInterfaceCD);
 
             var attributeClass = createTypeAttributes(classInfo);
-            var instanceClassDesc = compileUserTypeInstance(classInfo, classDesc, ClassDesc.of(attributeClass));
+            var instanceClassDesc = compileUserTypeInstance(classInfo,
+                    classDesc,
+                    ClassDesc.of(attributeClass),
+                    customizerConsumer);
             classBuilder.withField("INSTANCE", classDesc, Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
             classBuilder.withField("MRO", CD.of(List.class), Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
             classBuilder.withField("ATTRIBUTES", ClassDesc.of(attributeClass), Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL);
@@ -400,11 +404,14 @@ public class PyTypeCompiler {
         }
     }
 
-    public ClassDesc compileUserTypeInstance(ClassInfo classInfo, ClassDesc typeClassDesc, ClassDesc typeAttributeClassDesc) {
+    public ClassDesc compileUserTypeInstance(ClassInfo classInfo,
+            ClassDesc typeClassDesc,
+            ClassDesc typeAttributeClassDesc,
+            Consumer<UserTypeCustomizer> customizerConsumer) {
         var hasIteratorProtocol = classInfo.classAttributeToDefaultValue().containsKey("__iter__")
                 && classInfo.classAttributeToDefaultValue().containsKey("__next__");
-        var createdClass = cDisCompiler.createClass(classInfo.simpleName(), (classDesc, classBuilder) -> {
-            var markerInterfaceCD = getMarkerInterfaceDesc(classInfo.qualifiedName());
+        var createdClass = cDisCompiler.createUserClass(classInfo.qualifiedName(), (classDesc, classBuilder) -> {
+            var markerInterfaceCD = getUserMarkerInterfaceDesc(classInfo, customizerConsumer);
             var interfaces = new ArrayList<ClassDesc>();
             interfaces.add(CD.of(PyObject.class));
             interfaces.add(markerInterfaceCD);
@@ -476,7 +483,7 @@ public class PyTypeCompiler {
     }
 
     private String createTypeAttributes(ClassInfo classInfo) {
-        var createdClass = cDisCompiler.createClass(classInfo.qualifiedName() + "$TypeAttributes", (classDesc, classBuilder) -> {
+        var createdClass = cDisCompiler.createUserClass(classInfo.qualifiedName() + "$TypeAttributes", (classDesc, classBuilder) -> {
             var attributeInterfaces = new ArrayList<ClassDesc>();
             attributeInterfaces.add(CD.of(PyAttributes.class));
             for (var attr : classInfo.classAttributeToType().keySet()) {
@@ -598,7 +605,7 @@ public class PyTypeCompiler {
     }
 
     private String createTypeInstanceAttributes(ClassInfo classInfo, ClassDesc typeClassDesc, ClassDesc typeAttributeClassDesc) {
-        var createdClass = cDisCompiler.createClass(classInfo.qualifiedName() + "$Attributes", (classDesc, classBuilder) -> {
+        var createdClass = cDisCompiler.createUserClass(classInfo.qualifiedName() + "$Attributes", (classDesc, classBuilder) -> {
             var attributeInterfaces = new ArrayList<ClassDesc>();
             attributeInterfaces.add(CD.of(PyAttributes.class));
 

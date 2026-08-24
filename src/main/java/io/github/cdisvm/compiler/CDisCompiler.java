@@ -22,6 +22,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -54,10 +56,10 @@ public class CDisCompiler {
     public CDisCompiler() {
         this.classLoader = new CDisClassLoader();
         this.classFile = ClassFile.of();
-        this.cellIdToCellClass = new LinkedHashMap<>();
-        this.globalDictIdToGlobalToClass = new LinkedHashMap<>();
+        this.cellIdToCellClass = new ConcurrentHashMap<>();
+        this.globalDictIdToGlobalToClass = new ConcurrentHashMap<>();
         this.classIdGenerator = 0;
-        this.builtinSet = new LinkedHashSet<>();
+        this.builtinSet = new ConcurrentSkipListSet<>();
         this.typeCompiler = new PyTypeCompiler(this);
         createBuiltins();
     }
@@ -75,7 +77,11 @@ public class CDisCompiler {
     }
 
     public PyType lookupUserType(ClassInfo classInfo) {
-        return typeCompiler.compileUserType(classInfo);
+        return customizeUserType(classInfo, customizer -> {});
+    }
+
+    public PyType customizeUserType(ClassInfo classInfo, Consumer<UserTypeCustomizer> customizerConsumer) {
+        return typeCompiler.compileUserType(classInfo, customizerConsumer);
     }
 
     public AttributeDesc getAttributeDesc(String attributeName) {
@@ -146,6 +152,19 @@ public class CDisCompiler {
 
     public String createClass(String classNameHint, BiConsumer<ClassDesc, ClassBuilder> classBuilderConsumer) {
         var className = "io.github.cdisvm.codegen.builtins.builtin%s.%s".formatted(nextClassId(), classNameHint);
+        var classDesc = ClassDesc.of(className);
+        var bytecode = classFile.build(classDesc, cb -> classBuilderConsumer.accept(classDesc, cb));
+        classLoader.registerClass(className, bytecode);
+        return className;
+    }
+
+    public ClassDesc lookupUserClass(String name) {
+        var className = "io.github.cdisvm.codegen.user.%sMarker".formatted(arbitraryTextToJavaIdentifierName(name));
+        return ClassDesc.of(className);
+    }
+
+    public String createUserClass(String name, BiConsumer<ClassDesc, ClassBuilder> classBuilderConsumer) {
+        var className = "io.github.cdisvm.codegen.user.%s".formatted(arbitraryTextToJavaIdentifierName(name));
         var classDesc = ClassDesc.of(className);
         var bytecode = classFile.build(classDesc, cb -> classBuilderConsumer.accept(classDesc, cb));
         classLoader.registerClass(className, bytecode);

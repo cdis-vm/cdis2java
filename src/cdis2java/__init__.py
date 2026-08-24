@@ -572,6 +572,23 @@ def compile_function(func, visited=None, jar_path='target/cdis2java-999-SNAPSHOT
     return compiler.compile(java_bytecode)
 
 
+def lookup_class(cls):
+    global compiler
+    return compiler.lookupUserClass(cls.__qualname__)
+
+
+def customize_class(cls, customizer, jar_path='target/cdis2java-999-SNAPSHOT.jar'):
+    global compiler
+    start_jvm(jar_path)
+    JCDisCompiler = _jclass("io.github.cdisvm.compiler.CDisCompiler")
+    if compiler is None:
+        compiler = JCDisCompiler()
+    class_info = _convert_class_info(cls, set())
+    print(class_info)
+    compiler.customizeUserType(class_info, customizer)
+    return compiler.lookupUserClass(cls.__qualname__)
+
+
 def java_value(value):
     return _convert_py_constant(value)
 
