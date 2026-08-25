@@ -564,7 +564,7 @@ def compile_function(func, visited=None, jar_path='target/cdis2java-999-SNAPSHOT
     start_jvm(jar_path)
     JCDisCompiler = _jclass("io.github.cdisvm.compiler.CDisCompiler")
     if compiler is None:
-        compiler = JCDisCompiler()
+        compiler = JCDisCompiler(jar_path)
     if visited is None:
         visited = set()
     py_bytecode = to_bytecode(func)
@@ -582,10 +582,15 @@ def customize_class(cls, customizer, jar_path='target/cdis2java-999-SNAPSHOT.jar
     start_jvm(jar_path)
     JCDisCompiler = _jclass("io.github.cdisvm.compiler.CDisCompiler")
     if compiler is None:
-        compiler = JCDisCompiler()
+        compiler = JCDisCompiler(jar_path)
     class_info = _convert_class_info(cls, set())
     compiler.customizeUserType(class_info, customizer)
     return compiler.lookupUserClass(cls.__qualname__)
+
+
+def export_jar(path: str):
+    global compiler
+    compiler.exportJar(path)
 
 
 def as_interface(func, interface_name):

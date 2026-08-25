@@ -1,5 +1,9 @@
 package io.github.cdisvm.compiler;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.CodeBuilder;
@@ -11,7 +15,9 @@ import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,6 +32,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.jar.Attributes;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.JarInputStream;
+import java.util.jar.JarOutputStream;
+import java.util.jar.Manifest;
 
 import org.jspecify.annotations.Nullable;
 
@@ -57,8 +69,14 @@ public class CDisCompiler {
     private final Map<Long, Map<String, String>> globalDictIdToGlobalToClass;
     private final Set<String> builtinSet;
     private long classIdGenerator;
+    @Nullable
+    private final Path pathToJar;
 
     public CDisCompiler() {
+        this(null);
+    }
+
+    public CDisCompiler(String pathToJar) {
         this.classLoader = new CDisClassLoader();
         this.classFile = ClassFile.of();
         this.cellIdToCellClass = new ConcurrentHashMap<>();
@@ -66,6 +84,11 @@ public class CDisCompiler {
         this.classIdGenerator = 0;
         this.builtinSet = new ConcurrentSkipListSet<>();
         this.typeCompiler = new PyTypeCompiler(this);
+        if (pathToJar != null) {
+            this.pathToJar = Paths.get(pathToJar);
+        } else {
+            this.pathToJar = null;
+        }
         createBuiltins();
     }
 
@@ -95,6 +118,75 @@ public class CDisCompiler {
 
     public void dumpClasses() {
         classLoader.dumpClasses(Path.of("target", "cdis-generated-classes"));
+    }
+
+    public void exportJar(String target) throws IOException {
+        var path = Paths.get(target);
+        var tempDirectory = Files.createTempDirectory("cdis-jar");
+        classLoader.dumpClasses(tempDirectory);
+        createJar(tempDirectory.toFile(), path.toFile());
+    }
+
+    private void createJar(File sourceDir, File outputFile) throws IOException {
+        // 1. Create a basic Manifest
+        var manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+
+        // 2. Initialize the JarOutputStream
+        try (var jos = new JarOutputStream(new FileOutputStream(outputFile), manifest)) {
+            // 3. Start recursive compression
+            compressDirectory(sourceDir, sourceDir, jos);
+            // 4. copy the cdis jar too
+            if (pathToJar != null) {
+                try (var jis = new JarInputStream(new FileInputStream(pathToJar.toFile()))) {
+                    JarEntry entry;
+                    var buffer = new byte[4096];
+                    while ((entry = jis.getNextJarEntry()) != null) {
+                        jos.putNextEntry(new JarEntry(entry.getName()));
+
+                        int bytesRead;
+                        while ((bytesRead = jis.read(buffer)) != -1) {
+                            jos.write(buffer, 0, bytesRead);
+                        }
+
+                        jos.closeEntry();
+                        jis.closeEntry();
+                    }
+                }
+            }
+        }
+    }
+
+    private static void compressDirectory(File sourceDir, File currentDir, JarOutputStream jos) throws IOException {
+        var files = currentDir.listFiles();
+        if (files == null) return;
+
+        var buffer = new byte[4096];
+
+        for (var file : files) {
+            if (file.isDirectory()) {
+                // Recursively traverse subdirectories
+                compressDirectory(sourceDir, file, jos);
+            } else {
+                // Calculate relative path for the JAR entry structure
+                var relativePath = sourceDir.toURI().relativize(file.toURI()).getPath();
+
+                // JAR entries must use forward slashes
+                relativePath = relativePath.replace("\\", "/");
+
+                // Create and write the JAR entry
+                var entry = new JarEntry(relativePath);
+                jos.putNextEntry(entry);
+
+                try (var fis = new FileInputStream(file)) {
+                    int bytesRead;
+                    while ((bytesRead = fis.read(buffer)) != -1) {
+                        jos.write(buffer, 0, bytesRead);
+                    }
+                }
+                jos.closeEntry();
+            }
+        }
     }
 
     public void createBuiltins() {

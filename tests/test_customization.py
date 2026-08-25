@@ -38,3 +38,11 @@ def test_to_java_interface():
     assert java_predicate.test(1) is False
     assert java_predicate.test(6) is True
     c2j.compiler.dumpClasses()
+
+
+def test_export_jar():
+    def predicate(x):
+        return x > 5
+
+    c2j.as_interface(predicate, "java.util.function.IntPredicate")
+    c2j.export_jar("target/test.jar")
