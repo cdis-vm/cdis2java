@@ -13,7 +13,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -36,9 +36,14 @@ import io.github.cdisvm.runtime.PyCallable;
 import io.github.cdisvm.runtime.PyCell;
 import io.github.cdisvm.runtime.PyConstant;
 import io.github.cdisvm.runtime.PyGlobal;
+import io.github.cdisvm.runtime.PyIndexable;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.PyType;
 import io.github.cdisvm.runtime.annotation.PyBuiltin;
+import io.github.cdisvm.runtime.builtin.PyBool;
+import io.github.cdisvm.runtime.builtin.PyFloat;
+import io.github.cdisvm.runtime.builtin.PyInt;
+import io.github.cdisvm.runtime.builtin.PyList;
 import io.github.cdisvm.runtime.builtin.PyStr;
 import io.github.cdisvm.runtime.descriptor.PyGetDescriptor;
 import io.github.cdisvm.runtime.exception.PyBaseException;
@@ -179,6 +184,153 @@ public class CDisCompiler {
         }
         var callBuilder = createCallBuilder(bytecode.functionName(), bytecode.signature(), callBuilderInterfaces);
         return createCallable(bytecode, callBuilder);
+    }
+
+    public <T> T toJavaInterface(PyCallable callable, Class<T> interfaceClass) {
+        if (!(callable instanceof  PyConstant callableAsConstant)) {
+            throw new IllegalArgumentException();
+        }
+        var interfaceMethod = Arrays.stream(interfaceClass.getMethods())
+                .filter(m -> Modifier.isAbstract(m.getModifiers()))
+                .filter(m -> {
+                    try {
+                        java.lang.Object.class.getMethod(m.getName(), m.getParameterTypes());
+                        return false;
+                    } catch (NoSuchMethodException e) {
+                        return true;
+                    }
+                })
+                .findFirst()
+                .orElseThrow();
+        var className = "io.github.cdisvm.codegen.jinterface.%s.%s".formatted(nextClassId(),
+                callable.getClass().getSimpleName());
+        var classDesc = ClassDesc.of(className);
+        var bytecode = classFile.build(classDesc, classBuilder -> {
+            classBuilder.withInterfaceSymbols(CD.of(interfaceClass));
+
+            classBuilder.withField("callable", CD.PY_CALLABLE, Modifier.FINAL | Modifier.PRIVATE | Modifier.STATIC);
+            classBuilder.withMethodBody("<clinit>", MD.of(void.class), Modifier.PUBLIC | Modifier.STATIC, codeBuilder -> {
+                callableAsConstant.loadValueOntoStack(codeBuilder);
+                codeBuilder.putstatic(classDesc, "callable", CD.PY_CALLABLE);
+                codeBuilder.return_();
+            });
+
+            classBuilder.withMethodBody("<init>", MD.of(void.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.aload(0);
+                codeBuilder.invokespecial(CD.OBJECT, "<init>", MD.of(void.class));
+                codeBuilder.return_();
+            });
+
+            classBuilder.withMethodBody(interfaceMethod.getName(), MD.of(interfaceMethod), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.getstatic(classDesc, "callable", CD.PY_CALLABLE);
+                codeBuilder.invokeinterface(CD.PY_CALLABLE, "pyCallBuilder", MD.of(PyCallBuilder.class));
+                for (var i = 0; i < interfaceMethod.getParameterCount(); i++) {
+                    var parameterClass = interfaceMethod.getParameterTypes()[i];
+                    loadArgumentAsPyObject(codeBuilder, parameterClass, i);
+                    if (i < PyCallBuilder.MAX_POSITIONAL_ARG_METHOD) {
+                        codeBuilder.invokeinterface(CD.PY_CALL_BUILDER, "$" + i, MD.of(PyCallBuilder.class, PyObject.class));
+                    }
+                }
+                if (interfaceMethod.getReturnType().equals(void.class)) {
+                    codeBuilder.pop();
+                    codeBuilder.return_();
+                } else {
+                    codeBuilder.invokeinterface(CD.PY_CALL_BUILDER, "pyCall", MD.of(PyObject.class));
+                    castPyObjectToJavaClass(codeBuilder, interfaceMethod.getReturnType());
+                    codeBuilder.return_(TypeKind.from(interfaceMethod.getReturnType()));
+                }
+            });
+        });
+        classLoader.registerClass(className, bytecode);
+        try {
+            return (T) classLoader.loadClass(className).getConstructor().newInstance();
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException |
+                ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void loadArgumentAsPyObject(CodeBuilder codeBuilder, Class<?> parameterClass, int parameterIndex) {
+        var slot = parameterIndex + 1;
+        if (parameterClass.isPrimitive()) {
+            switch (parameterClass.getSimpleName()) {
+                case "int", "short", "byte", "char", "boolean" -> {
+                    codeBuilder.iload(slot);
+                    if (parameterClass.equals(boolean.class)) {
+                        codeBuilder.invokestatic(CD.PY_BOOL, "of", MD.of(PyBool.class, boolean.class));
+                    } else {
+                        codeBuilder.i2l();
+                        codeBuilder.invokestatic(CD.of(PyInt.class), "of", MD.of(PyInt.class, long.class));
+                    }
+                }
+                case "float" -> {
+                    codeBuilder.fload(slot);
+                    codeBuilder.f2d();
+                    codeBuilder.invokestatic(CD.of(PyFloat.class), "of", MD.of(PyFloat.class, double.class));
+
+                }
+                case "double" -> {
+                    codeBuilder.dload(slot);
+                    codeBuilder.invokestatic(CD.of(PyFloat.class), "of", MD.of(PyFloat.class, double.class));
+                }
+                case "long" -> {
+                    codeBuilder.lload(slot);
+                    codeBuilder.invokestatic(CD.of(PyInt.class), "of", MD.of(PyInt.class, long.class));
+                }
+            }
+        } else {
+            if (parameterClass.equals(String.class)) {
+                codeBuilder.new_(CD.of(PyStr.class));
+                codeBuilder.dup();
+                codeBuilder.aload(slot);
+                codeBuilder.invokespecial(CD.of(PyStr.class), "<init>", MD.of(void.class, String.class));
+            } else if (parameterClass.isAssignableFrom(List.class)) {
+                codeBuilder.new_(CD.of(PyList.class));
+                codeBuilder.dup();
+                codeBuilder.aload(slot);
+                codeBuilder.invokespecial(CD.of(PyList.class), "<init>", MD.of(void.class, List.class));
+            } else {
+                codeBuilder.aload(slot);
+                codeBuilder.checkcast(CD.PY_OBJECT);
+            }
+        }
+    }
+
+    private void castPyObjectToJavaClass(CodeBuilder codeBuilder, Class<?> returnType) {
+        if (returnType.isPrimitive()) {
+            switch (returnType.getSimpleName()) {
+                case "boolean" -> {
+                    codeBuilder.invokeinterface(CD.PY_OBJECT, "pyTruth", MD.of(PyBool.class));
+                    codeBuilder.invokevirtual(CD.PY_BOOL, "value", MD.of(boolean.class));
+                }
+                case "int", "short", "byte", "char" -> {
+                    codeBuilder.checkcast(CD.of(PyIndexable.class));
+                    codeBuilder.invokeinterface(CD.of(PyIndexable.class), "pyIndex", MD.of(PyInt.class));
+                    codeBuilder.invokevirtual(CD.of(PyInt.class), "intValue", MD.of(int.class));
+                }
+                case "float" -> {
+                    codeBuilder.checkcast(CD.of(PyFloat.class));
+                    codeBuilder.invokevirtual(CD.of(PyFloat.class), "value", MD.of(double.class));
+                    codeBuilder.d2f();
+                }
+                case "double" -> {
+                    codeBuilder.checkcast(CD.of(PyFloat.class));
+                    codeBuilder.invokevirtual(CD.of(PyFloat.class), "value", MD.of(double.class));
+                }
+                case "long" -> {
+                    codeBuilder.checkcast(CD.of(PyIndexable.class));
+                    codeBuilder.invokeinterface(CD.of(PyIndexable.class), "pyIndex", MD.of(PyInt.class));
+                    codeBuilder.invokevirtual(CD.of(PyInt.class), "smallValue", MD.of(long.class));
+                }
+            }
+        } else {
+            if (returnType.equals(String.class)) {
+                codeBuilder.checkcast(CD.of(PyStr.class));
+                codeBuilder.invokevirtual(CD.of(PyStr.class), "value", MD.of(String.class));
+            } else {
+                codeBuilder.checkcast(CD.of(returnType));
+            }
+        }
     }
 
     private String nextClassId() {

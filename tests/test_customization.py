@@ -22,3 +22,13 @@ def test_customizer():
 
     c2j.customize_class(B, customize)
     c2j.compiler.dumpClasses()
+
+
+def test_to_java_interface():
+    def predicate(x):
+        return x > 5
+
+    java_predicate = c2j.as_interface(predicate, "java.util.function.IntPredicate")
+    assert java_predicate.test(1) is False
+    assert java_predicate.test(6) is True
+    c2j.compiler.dumpClasses()

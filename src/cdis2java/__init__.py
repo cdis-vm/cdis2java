@@ -584,9 +584,14 @@ def customize_class(cls, customizer, jar_path='target/cdis2java-999-SNAPSHOT.jar
     if compiler is None:
         compiler = JCDisCompiler()
     class_info = _convert_class_info(cls, set())
-    print(class_info)
     compiler.customizeUserType(class_info, customizer)
     return compiler.lookupUserClass(cls.__qualname__)
+
+
+def as_interface(func, interface_name):
+    global compiler
+    compiled_callable = compile_function(func)
+    return compiler.toJavaInterface(compiled_callable, _jclass(interface_name))
 
 
 def java_value(value):
