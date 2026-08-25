@@ -6,6 +6,7 @@ class A:
 
 class B:
     x: A
+    y: list[A]
 
 
 def test_customizer():
@@ -15,6 +16,11 @@ def test_customizer():
             'since': '2.0.0'
         })
         customizer.add_getter_setter('x', c2j.lookup_class(A),
+                                     {
+                                         'annotationType': 'java.lang.Deprecated',
+                                         'since': '1.0.0'
+                                     })
+        customizer.add_list_getter_setter('y', c2j.lookup_class(A),
                                      {
                                          'annotationType': 'java.lang.Deprecated',
                                          'since': '1.0.0'

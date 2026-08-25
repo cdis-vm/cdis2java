@@ -60,12 +60,14 @@ public record PyDict<Key_ extends PyObject, Value_ extends PyObject>(SequencedMa
             if (entry.getKey() instanceof PyConstant key) {
                 key.loadValueOntoStack(codeBuilder);
             } else {
-                throw new UnsupportedOperationException("Unsupported type: " + entry.getKey());
+                // Might be generic/defined in C, init to null
+                codeBuilder.aconst_null();
             }
             if (entry.getValue() instanceof PyConstant value) {
                 value.loadValueOntoStack(codeBuilder);
             } else {
-                throw new UnsupportedOperationException("Unsupported type: " + entry.getKey());
+                // Might be generic/defined in C, init to null
+                codeBuilder.aconst_null();
             }
             codeBuilder.invokeinterface(CD.of(Map.class), "put", MD.of(Object.class, Object.class, Object.class));
             codeBuilder.pop();

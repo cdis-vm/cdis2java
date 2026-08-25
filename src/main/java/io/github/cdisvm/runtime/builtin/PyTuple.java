@@ -59,7 +59,8 @@ public class PyTuple<T extends PyObject> extends PySequenceBase<T> implements Py
             if (value instanceof PyConstant constant) {
                 constant.loadValueOntoStack(codeBuilder);
             } else {
-                throw new UnsupportedOperationException("Unsupported type: " + value);
+                // Might be generic/defined in C, init to null
+                codeBuilder.aconst_null();
             }
             codeBuilder.invokeinterface(CD.of(List.class), "add", MD.of(boolean.class, Object.class));
             codeBuilder.pop();

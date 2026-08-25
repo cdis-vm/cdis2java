@@ -654,10 +654,10 @@ def is_defined_in_c(obj):
     try:
         inspect.getsource(obj)
         return False
-    except TypeError:
+    except Exception:
         # C extensions and built-ins do not have a Python source file
         try:
             inspect.getsource(obj_type)
             return False
-        except TypeError:
+        except Exception:
             return True

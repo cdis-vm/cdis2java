@@ -508,7 +508,8 @@ public class PyTypeCompiler {
                     if (value instanceof PyConstant constant) {
                         constant.loadValueOntoStack(codeBuilder);
                     } else {
-                        throw new UnsupportedOperationException("Unsupported type: " + value);
+                        // Generic/C, initialize to null
+                        codeBuilder.aconst_null();
                     }
                     codeBuilder.putfield(classDesc, attr.getKey(), CD.PY_OBJECT);
                 }

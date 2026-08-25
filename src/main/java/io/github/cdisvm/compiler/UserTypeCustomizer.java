@@ -4,11 +4,15 @@ import java.lang.classfile.Annotation;
 import java.lang.classfile.AnnotationElement;
 import java.lang.classfile.AnnotationValue;
 import java.lang.classfile.ClassBuilder;
+import java.lang.classfile.MethodSignature;
+import java.lang.classfile.Signature;
 import java.lang.classfile.attribute.RuntimeVisibleAnnotationsAttribute;
+import java.lang.classfile.attribute.SignatureAttribute;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import io.github.cdisvm.runtime.PyAttributes;
@@ -95,6 +99,49 @@ public record UserTypeCustomizer(
             codeBuilder.checkcast(CD.PY_OBJECT);
             codeBuilder.invokeinterface(attrDesc.interfaceDesc(), attrDesc.setter(), MD.of(void.class, PyObject.class));
             codeBuilder.return_();
+        });
+    }
+
+    @SafeVarargs
+    public final void add_list_getter_setter(String propertyName,
+            ClassDesc typeDesc,
+            Map<String, Object>... annotations) {
+        var baseName = Character.toUpperCase(propertyName.charAt(0)) + propertyName.substring(1);
+        var getterName = "get" + baseName;
+        var setterName = "set" + baseName;
+
+        classBuilder.withMethod(getterName, MD.of(List.class), Modifier.PUBLIC, methodBuilder -> {
+            methodBuilder.accept(getAnnotationAttribute(annotations));
+            methodBuilder.accept(SignatureAttribute.of(
+                    MethodSignature.parseFrom("()Ljava/util/List<%s>;".formatted(typeDesc.descriptorString()))));
+            methodBuilder.withCode(codeBuilder -> {
+                codeBuilder.aload(0);
+                codeBuilder.checkcast(CD.PY_OBJECT);
+                codeBuilder.invokeinterface(CD.PY_OBJECT, "pyAttributes", MD.of(PyAttributes.class));
+                var attrDesc = compiler.getAttributeDesc(propertyName);
+                codeBuilder.checkcast(attrDesc.interfaceDesc());
+                codeBuilder.invokeinterface(attrDesc.interfaceDesc(), attrDesc.getter(), MD.of(PyObject.class));
+                codeBuilder.checkcast(CD.of(List.class));
+                codeBuilder.areturn();
+            });
+        });
+
+        classBuilder.withMethod(setterName, MethodTypeDesc.of(CD.VOID, typeDesc), Modifier.PUBLIC, methodBuilder -> {
+            methodBuilder.accept(SignatureAttribute.of(
+                    MethodSignature.parseFrom("(Ljava/util/List<%s>;)V".formatted(typeDesc.descriptorString()))));
+            methodBuilder.withCode(codeBuilder -> {
+                codeBuilder.aload(0);
+                codeBuilder.checkcast(CD.PY_OBJECT);
+                codeBuilder.invokeinterface(CD.PY_OBJECT, "pyAttributes", MD.of(PyAttributes.class));
+                var attrDesc = compiler.getAttributeDesc(propertyName);
+                codeBuilder.checkcast(attrDesc.interfaceDesc());
+                codeBuilder.new_(CD.PY_LIST);
+                codeBuilder.dup();
+                codeBuilder.aload(1);
+                codeBuilder.invokespecial(CD.PY_LIST, "<init>", MD.of(void.class, List.class));
+                codeBuilder.invokeinterface(attrDesc.interfaceDesc(), attrDesc.setter(), MD.of(void.class, PyObject.class));
+                codeBuilder.return_();
+            });
         });
     }
 }
