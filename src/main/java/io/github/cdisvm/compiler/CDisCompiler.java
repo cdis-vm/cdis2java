@@ -376,7 +376,7 @@ public class CDisCompiler {
                 codeBuilder.dup();
                 codeBuilder.aload(slot);
                 codeBuilder.invokespecial(CD.of(PyStr.class), "<init>", MD.of(void.class, String.class));
-            } else if (parameterClass.isAssignableFrom(List.class)) {
+            } else if (List.class.isAssignableFrom(parameterClass)) {
                 codeBuilder.new_(CD.of(PyList.class));
                 codeBuilder.dup();
                 codeBuilder.aload(slot);
