@@ -1,5 +1,6 @@
 package io.github.cdisvm.runtime.builtin;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -26,6 +27,11 @@ public class PyDefaultInstanceAttributes implements PyAttributes {
 
     public PyAttributes typeAttributes() {
         return typeAttributes;
+    }
+
+    @Override
+    public Collection<String> attributeNames() {
+        return attributeToValue.keySet();
     }
 
     @Override

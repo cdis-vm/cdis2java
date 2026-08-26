@@ -1,5 +1,8 @@
 package io.github.cdisvm.runtime.builtin;
 
+import java.util.Collection;
+import java.util.Collections;
+
 import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyObject;
 import io.github.cdisvm.runtime.exception.PyAttributeError;
@@ -8,6 +11,11 @@ public final class PyEmptyAttributes implements PyAttributes {
     public static final PyEmptyAttributes INSTANCE = new PyEmptyAttributes();
 
     private PyEmptyAttributes() {}
+
+    @Override
+    public Collection<String> attributeNames() {
+        return Collections.emptyList();
+    }
 
     @Override
     public PyObject getAttributeByNameOrNull(String name) {

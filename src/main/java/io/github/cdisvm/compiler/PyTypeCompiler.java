@@ -5,6 +5,7 @@ import java.lang.constant.ClassDesc;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -551,6 +552,27 @@ public class PyTypeCompiler {
                 });
             }
 
+            classBuilder.withMethodBody("attributeNames", MD.of(Collection.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.new_(CD.of(ArrayList.class));
+                codeBuilder.dup();
+                codeBuilder.aload(0);
+                codeBuilder.invokeinterface(CD.of(PyAttributes.class), "attributeNames", MD.of(Collection.class));
+                codeBuilder.invokespecial(CD.of(ArrayList.class), "<init>", MD.of(void.class, Collection.class));
+                for (var attr : classInfo.classAttributeToType().keySet()) {
+                    codeBuilder.aload(0);
+                    codeBuilder.invokevirtual(classDesc, getAttributeDesc(attr).getter(), MD.of(PyObject.class));
+                    codeBuilder.aconst_null();
+                    var skip = codeBuilder.newLabel();
+                    codeBuilder.if_acmpeq(skip);
+                    codeBuilder.dup();
+                    codeBuilder.loadConstant(attr);
+                    codeBuilder.invokevirtual(CD.of(ArrayList.class), "add", MD.of(boolean.class, Object.class));
+                    codeBuilder.pop();
+                    codeBuilder.labelBinding(skip);
+                }
+                codeBuilder.areturn();
+            });
+
             classBuilder.withMethodBody("getAttributeByNameOrNull", MD.of(PyObject.class, String.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(1);
                 BytecodeUtil.implementStringSwitchCase(codeBuilder,
@@ -741,6 +763,27 @@ public class PyTypeCompiler {
                     codeBuilder.return_();
                 });
             }
+
+            classBuilder.withMethodBody("attributeNames", MD.of(Collection.class), Modifier.PUBLIC, codeBuilder -> {
+                codeBuilder.new_(CD.of(ArrayList.class));
+                codeBuilder.dup();
+                codeBuilder.aload(0);
+                codeBuilder.invokeinterface(CD.of(PyAttributes.class), "attributeNames", MD.of(Collection.class));
+                codeBuilder.invokespecial(CD.of(ArrayList.class), "<init>", MD.of(void.class, Collection.class));
+                for (var attr : classInfo.instanceAttributeToType().keySet()) {
+                    codeBuilder.aload(0);
+                    codeBuilder.invokevirtual(classDesc, getAttributeDesc(attr).getter(), MD.of(PyObject.class));
+                    codeBuilder.aconst_null();
+                    var skip = codeBuilder.newLabel();
+                    codeBuilder.if_acmpeq(skip);
+                    codeBuilder.dup();
+                    codeBuilder.loadConstant(attr);
+                    codeBuilder.invokevirtual(CD.of(ArrayList.class), "add", MD.of(boolean.class, Object.class));
+                    codeBuilder.pop();
+                    codeBuilder.labelBinding(skip);
+                }
+                codeBuilder.areturn();
+            });
 
             classBuilder.withMethodBody("getAttributeByNameOrNull", MD.of(PyObject.class, String.class), Modifier.PUBLIC, codeBuilder -> {
                 codeBuilder.aload(1);
