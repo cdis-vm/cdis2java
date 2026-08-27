@@ -41,7 +41,7 @@ public record PyFloat(double value) implements PyObject,
         PyModuloAble, PyFloorDividable, PyPowAble,
         PyHasPos, PyNegatable,
         PyHasEquals, PyHasNotEquals, PyHasLessThan, PyHasLessThanOrEqual, PyHasGreaterThan,
-        PyHasGreaterThanOrEqual, Comparable<PyFloat> {
+        PyHasGreaterThanOrEqual {
     public static PyType type;
 
     @PyConstructor
@@ -229,10 +229,5 @@ public record PyFloat(double value) implements PyObject,
             }
         }
         return false;
-    }
-
-    @Override
-    public int compareTo(PyFloat other) {
-        return Double.compare(value, other.value);
     }
 }

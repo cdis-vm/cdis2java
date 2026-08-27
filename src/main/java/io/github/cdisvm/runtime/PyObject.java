@@ -4,9 +4,11 @@ import java.util.IdentityHashMap;
 
 import io.github.cdisvm.runtime.builtin.PyBool;
 import io.github.cdisvm.runtime.builtin.PyDefaultAttributes;
+import io.github.cdisvm.runtime.builtin.PyNotImplemented;
 import io.github.cdisvm.runtime.builtin.PyStr;
+import io.github.cdisvm.runtime.comparison.PyHasLessThan;
 
-public interface PyObject {
+public interface PyObject extends Comparable<PyObject> {
     // TODO: actually implement this inside the class
     IdentityHashMap<PyObject, PyAttributes> objectToAttributeMap = new IdentityHashMap<>();
 
@@ -24,5 +26,22 @@ public interface PyObject {
     }
     default PyStr pyRepr() {
         return new PyStr(toString());
+    }
+    default int compareTo(PyObject other) {
+        var lessThanResult = PyHasLessThan.lessThanResult(this, other);
+        if (lessThanResult == PyNotImplemented.INSTANCE) {
+            throw new UnsupportedOperationException();
+        }
+        if (lessThanResult.pyTruth().value()) {
+            return -1;
+        }
+        lessThanResult = PyHasLessThan.lessThanResult(other, this);
+        if (lessThanResult == PyNotImplemented.INSTANCE) {
+            throw new UnsupportedOperationException();
+        }
+        if (lessThanResult.pyTruth().value()) {
+            return 1;
+        }
+        return 0;
     }
 }
