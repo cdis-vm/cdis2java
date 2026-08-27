@@ -17,6 +17,8 @@ import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyCallBuilder;
 import io.github.cdisvm.runtime.PyCallable;
 import io.github.cdisvm.runtime.PyConstant;
+import io.github.cdisvm.runtime.PyHashable;
+import io.github.cdisvm.runtime.PyIndexable;
 import io.github.cdisvm.runtime.PyIterable;
 import io.github.cdisvm.runtime.PyIterator;
 import io.github.cdisvm.runtime.PyObject;
@@ -28,11 +30,20 @@ import io.github.cdisvm.runtime.annotation.PyKwArgs;
 import io.github.cdisvm.runtime.annotation.PyKwOnly;
 import io.github.cdisvm.runtime.annotation.PyPosOnly;
 import io.github.cdisvm.runtime.annotation.PyVarArgs;
+import io.github.cdisvm.runtime.builtin.PyBool;
 import io.github.cdisvm.runtime.builtin.PyDefaultInstanceAttributes;
 import io.github.cdisvm.runtime.builtin.PyDefaultTypeAttributes;
+import io.github.cdisvm.runtime.builtin.PyInt;
+import io.github.cdisvm.runtime.builtin.PyNotImplemented;
 import io.github.cdisvm.runtime.builtin.PyObjectType;
 import io.github.cdisvm.runtime.builtin.PyTypeType;
 import io.github.cdisvm.runtime.builtin.PyUserTypeCallBuilder;
+import io.github.cdisvm.runtime.comparison.PyHasEquals;
+import io.github.cdisvm.runtime.comparison.PyHasGreaterThan;
+import io.github.cdisvm.runtime.comparison.PyHasGreaterThanOrEqual;
+import io.github.cdisvm.runtime.comparison.PyHasLessThan;
+import io.github.cdisvm.runtime.comparison.PyHasLessThanOrEqual;
+import io.github.cdisvm.runtime.comparison.PyHasNotEquals;
 import io.github.cdisvm.runtime.descriptor.PyDeleteDescriptor;
 import io.github.cdisvm.runtime.descriptor.PyGetDescriptor;
 import io.github.cdisvm.runtime.descriptor.PySetDescriptor;
@@ -409,8 +420,18 @@ public class PyTypeCompiler {
             ClassDesc typeClassDesc,
             ClassDesc typeAttributeClassDesc,
             Consumer<UserTypeCustomizer> customizerConsumer) {
-        var hasIteratorProtocol = classInfo.classAttributeToDefaultValue().containsKey("__iter__")
-                && classInfo.classAttributeToDefaultValue().containsKey("__next__");
+        var classAttributeToDefaultValue = classInfo.classAttributeToDefaultValue();
+        var hasIteratorProtocol = classAttributeToDefaultValue.containsKey("__iter__")
+                && classAttributeToDefaultValue.containsKey("__next__");
+        var hasEquals = classAttributeToDefaultValue.containsKey("__eq__");
+        var hasNotEquals = classAttributeToDefaultValue.containsKey("__ne__");
+        var hasLessThan = classAttributeToDefaultValue.containsKey("__lt__");
+        var hasLessThanOrEqual = classAttributeToDefaultValue.containsKey("__le__");
+        var hasGreaterThan = classAttributeToDefaultValue.containsKey("__gt__");
+        var hasGreaterThanOrEqual = classAttributeToDefaultValue.containsKey("__ge__");
+        var hasHash = classAttributeToDefaultValue.containsKey("__hash__");
+        var hasComparisonDunder = hasEquals || hasNotEquals || hasLessThan
+                || hasLessThanOrEqual || hasGreaterThan || hasGreaterThanOrEqual;
         var createdClass = cDisCompiler.createUserClass(classInfo.qualifiedName(), (classDesc, classBuilder) -> {
             var markerInterfaceCD = getUserMarkerInterfaceDesc(classInfo, customizerConsumer);
             var interfaces = new ArrayList<ClassDesc>();
@@ -419,6 +440,30 @@ public class PyTypeCompiler {
             if (hasIteratorProtocol) {
                 interfaces.add(CD.of(PyIterable.class));
                 interfaces.add(CD.of(PyIterator.class));
+            }
+            if (hasEquals) {
+                interfaces.add(CD.of(PyHasEquals.class));
+            }
+            if (hasNotEquals) {
+                interfaces.add(CD.of(PyHasNotEquals.class));
+            }
+            if (hasLessThan) {
+                interfaces.add(CD.of(PyHasLessThan.class));
+            }
+            if (hasLessThanOrEqual) {
+                interfaces.add(CD.of(PyHasLessThanOrEqual.class));
+            }
+            if (hasGreaterThan) {
+                interfaces.add(CD.of(PyHasGreaterThan.class));
+            }
+            if (hasGreaterThanOrEqual) {
+                interfaces.add(CD.of(PyHasGreaterThanOrEqual.class));
+            }
+            if (hasHash) {
+                interfaces.add(CD.of(PyHashable.class));
+            }
+            if (hasComparisonDunder) {
+                interfaces.add(CD.of(Comparable.class));
             }
             classBuilder.withInterfaceSymbols(interfaces);
 
@@ -479,8 +524,199 @@ public class PyTypeCompiler {
                             }));
                 });
             }
+            if (hasEquals) {
+                classBuilder.withMethodBody("pyEquals", MD.of(PyObject.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    callDunderMethod(codeBuilder, "__eq__", 1);
+                    codeBuilder.areturn();
+                });
+                classBuilder.withMethodBody("equals", MD.of(boolean.class, Object.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.aload(1);
+                    codeBuilder.dup();
+                    codeBuilder.instanceOf(CD.PY_OBJECT);
+                    var notPyObjectLabel = codeBuilder.newLabel();
+                    codeBuilder.ifeq(notPyObjectLabel);
+                    codeBuilder.checkcast(CD.PY_OBJECT);
+                    codeBuilder.astore(2);
+                    codeBuilder.aload(0);
+                    codeBuilder.aload(2);
+                    codeBuilder.invokevirtual(classDesc, "pyEquals", MD.of(PyObject.class, PyObject.class));
+                    codeBuilder.dup();
+                    codeBuilder.getstatic(CD.of(PyNotImplemented.class), "INSTANCE", CD.of(PyNotImplemented.class));
+                    var isNotImplementedLabel = codeBuilder.newLabel();
+                    codeBuilder.if_acmpeq(isNotImplementedLabel);
+                    pushPyTruthValue(codeBuilder);
+                    codeBuilder.ireturn();
+                    codeBuilder.labelBinding(isNotImplementedLabel);
+                    codeBuilder.pop();
+                    codeBuilder.iconst_0();
+                    codeBuilder.ireturn();
+                    codeBuilder.labelBinding(notPyObjectLabel);
+                    codeBuilder.pop();
+                    codeBuilder.iconst_0();
+                    codeBuilder.ireturn();
+                });
+            }
+            if (hasNotEquals) {
+                classBuilder.withMethodBody("pyNotEquals", MD.of(PyObject.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    callDunderMethod(codeBuilder, "__ne__", 1);
+                    codeBuilder.areturn();
+                });
+            }
+            if (hasLessThan) {
+                classBuilder.withMethodBody("pyLessThan", MD.of(PyObject.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    callDunderMethod(codeBuilder, "__lt__", 1);
+                    codeBuilder.areturn();
+                });
+            }
+            if (hasLessThanOrEqual) {
+                classBuilder.withMethodBody("pyLessThanOrEqual", MD.of(PyObject.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    callDunderMethod(codeBuilder, "__le__", 1);
+                    codeBuilder.areturn();
+                });
+            }
+            if (hasGreaterThan) {
+                classBuilder.withMethodBody("pyGreaterThan", MD.of(PyObject.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    callDunderMethod(codeBuilder, "__gt__", 1);
+                    codeBuilder.areturn();
+                });
+            }
+            if (hasGreaterThanOrEqual) {
+                classBuilder.withMethodBody("pyGreaterThanOrEqual", MD.of(PyObject.class, PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    callDunderMethod(codeBuilder, "__ge__", 1);
+                    codeBuilder.areturn();
+                });
+            }
+            if (hasHash) {
+                classBuilder.withMethodBody("pyHash", MD.of(PyObject.class), Modifier.PUBLIC, codeBuilder -> {
+                    callDunderMethod(codeBuilder, "__hash__", -1);
+                    codeBuilder.areturn();
+                });
+                classBuilder.withMethodBody("hashCode", MD.of(int.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.aload(0);
+                    codeBuilder.invokevirtual(classDesc, "pyHash", MD.of(PyObject.class));
+                    codeBuilder.invokestatic(CD.of(PyIndexable.class), "wrapping", MD.of(PyIndexable.class, PyObject.class), true);
+                    codeBuilder.invokeinterface(CD.of(PyIndexable.class), "pyIndex", MD.of(PyInt.class));
+                    codeBuilder.invokevirtual(CD.of(PyInt.class), "intValue", MD.of(int.class));
+                    codeBuilder.ireturn();
+                });
+            }
+            if (hasComparisonDunder) {
+                classBuilder.withMethodBody("compareTo", MD.of(int.class, Object.class), Modifier.PUBLIC, codeBuilder -> {
+                    codeBuilder.aload(1);
+                    codeBuilder.checkcast(CD.PY_OBJECT);
+                    codeBuilder.astore(2);
+
+                    computeDunderSlot(codeBuilder, "__lt__", 3, hasLessThan);
+                    computeDunderSlot(codeBuilder, "__gt__", 4, hasGreaterThan);
+                    computeDunderSlot(codeBuilder, "__eq__", 5, hasEquals);
+                    computeDunderSlot(codeBuilder, "__le__", 6, hasLessThanOrEqual);
+                    computeDunderSlot(codeBuilder, "__ge__", 7, hasGreaterThanOrEqual);
+
+                    // __lt__ truthy → -1
+                    if (hasLessThan) {
+                        pushSlotTruthValue(codeBuilder, 3);
+                        var notLessThanLabel = codeBuilder.newLabel();
+                        codeBuilder.ifeq(notLessThanLabel);
+                        codeBuilder.iconst_m1();
+                        codeBuilder.ireturn();
+                        codeBuilder.labelBinding(notLessThanLabel);
+                    }
+                    // __gt__ truthy → 1
+                    if (hasGreaterThan) {
+                        pushSlotTruthValue(codeBuilder, 4);
+                        var notGreaterThanLabel = codeBuilder.newLabel();
+                        codeBuilder.ifeq(notGreaterThanLabel);
+                        codeBuilder.iconst_1();
+                        codeBuilder.ireturn();
+                        codeBuilder.labelBinding(notGreaterThanLabel);
+                    }
+                    // __eq__ truthy → 0
+                    if (hasEquals) {
+                        pushSlotTruthValue(codeBuilder, 5);
+                        var notEqualsLabel = codeBuilder.newLabel();
+                        codeBuilder.ifeq(notEqualsLabel);
+                        codeBuilder.iconst_0();
+                        codeBuilder.ireturn();
+                        codeBuilder.labelBinding(notEqualsLabel);
+                    }
+                    // __le__ && __ge__ → equal, __le__ && !__ge__ → -1, !__le__ && __ge__ → 1
+                    if (hasLessThanOrEqual && hasGreaterThanOrEqual) {
+                        pushSlotTruthValue(codeBuilder, 6);
+                        var lessThanOrEqualFalseLabel = codeBuilder.newLabel();
+                        codeBuilder.ifeq(lessThanOrEqualFalseLabel);
+                        pushSlotTruthValue(codeBuilder, 7);
+                        var greaterThanOrEqualTruthyLabel = codeBuilder.newLabel();
+                        codeBuilder.ifne(greaterThanOrEqualTruthyLabel);
+                        codeBuilder.iconst_m1();
+                        codeBuilder.ireturn();
+                        codeBuilder.labelBinding(greaterThanOrEqualTruthyLabel);
+                        codeBuilder.iconst_0();
+                        codeBuilder.ireturn();
+                        codeBuilder.labelBinding(lessThanOrEqualFalseLabel);
+                        pushSlotTruthValue(codeBuilder, 7);
+                        var greaterThanOrEqualFalseLabel = codeBuilder.newLabel();
+                        codeBuilder.ifeq(greaterThanOrEqualFalseLabel);
+                        codeBuilder.iconst_1();
+                        codeBuilder.ireturn();
+                        codeBuilder.labelBinding(greaterThanOrEqualFalseLabel);
+                    }
+                    // __lt__ and __eq__ were both computed and falsey (or __eq__ was computed and falsey) → 1
+                    if (hasLessThan && hasEquals) {
+                        codeBuilder.iconst_1();
+                        codeBuilder.ireturn();
+                    }
+                    // __gt__ and __eq__ were both computed and falsey (or __eq__ was computed and falsey) → -1
+                    if (hasGreaterThan && hasEquals) {
+                        codeBuilder.iconst_m1();
+                        codeBuilder.ireturn();
+                    }
+                    codeBuilder.iconst_0();
+                    codeBuilder.ireturn();
+                });
+            }
         });
         return ClassDesc.of(createdClass);
+    }
+
+    // Calls the dunder method stored as a class attribute of this instance's type.
+    // If otherSlot is non-negative, the argument stored in that slot is passed to the method.
+    // Leaves the PyObject result on top of the stack.
+    private void callDunderMethod(CodeBuilder codeBuilder, String dunderName, int otherSlot) {
+        codeBuilder.aload(0);
+        codeBuilder.invokeinterface(CD.PY_OBJECT, "pyAttributes", MD.of(PyAttributes.class));
+        codeBuilder.loadConstant(dunderName);
+        codeBuilder.invokeinterface(CD.of(PyAttributes.class), "getAttributeByName", MD.of(PyObject.class, String.class));
+        codeBuilder.checkcast(CD.PY_CALLABLE);
+        codeBuilder.invokeinterface(CD.PY_CALLABLE, "pyCallBuilder", MD.of(PyCallBuilder.class));
+        if (otherSlot >= 0) {
+            codeBuilder.aload(otherSlot);
+            codeBuilder.invokeinterface(CD.PY_CALL_BUILDER, "$appendArgument", MD.of(PyCallBuilder.class, PyObject.class));
+        }
+        codeBuilder.invokeinterface(CD.PY_CALL_BUILDER, "pyCall", MD.of(PyObject.class));
+    }
+
+    // Stores the result of calling the dunder method stored as a class attribute of this
+    // instance's type in the given slot, passing the argument stored in slot 2.
+    // If the dunder is not present, stores null in the slot instead.
+    private void computeDunderSlot(CodeBuilder codeBuilder, String dunderName, int slot, boolean present) {
+        if (present) {
+            callDunderMethod(codeBuilder, dunderName, 2);
+        } else {
+            codeBuilder.aconst_null();
+        }
+        codeBuilder.astore(slot);
+    }
+
+    // Pushes the truth value (0 or 1) of the PyObject on top of the stack.
+    private void pushPyTruthValue(CodeBuilder codeBuilder) {
+        codeBuilder.invokeinterface(CD.PY_OBJECT, "pyTruth", MD.of(PyBool.class));
+        codeBuilder.invokevirtual(CD.PY_BOOL, "value", MD.of(boolean.class));
+    }
+
+    // Pushes the truth value (0 or 1) of the PyObject stored in the given slot.
+    private void pushSlotTruthValue(CodeBuilder codeBuilder, int slot) {
+        codeBuilder.aload(slot);
+        pushPyTruthValue(codeBuilder);
     }
 
     private String createTypeAttributes(ClassInfo classInfo) {
