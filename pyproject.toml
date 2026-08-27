@@ -24,6 +24,7 @@ classifiers = [
 ]
 
 dependencies = [
+  "cdis~=0.0.1a0",
   "jpype1~=1.6.0"
 ]
 
