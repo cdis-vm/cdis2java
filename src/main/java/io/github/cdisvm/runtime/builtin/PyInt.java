@@ -50,7 +50,7 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
         PyModuloAble, PyFloorDividable, PyLShiftable, PyRShiftable, PyPowAble, PyBitOrAble,
         PyBitAndAble, PyBitXorAble, PyHasPos, PyNegatable, PyInvertible,
         PyHasEquals, PyHasNotEquals, PyHasLessThan, PyHasLessThanOrEqual, PyHasGreaterThan,
-        PyHasGreaterThanOrEqual, PyFormattable {
+        PyHasGreaterThanOrEqual, PyFormattable, Comparable<PyInt> {
     public static PyType type;
     private static final int CACHE_START = -10;
     private static final int CACHE_END = 256;
@@ -528,5 +528,11 @@ public record PyInt(long smallValue, @Nullable BigInteger bigValue) implements P
                 throw new PyValueError("Unsupported format specification: " + formatSpec);
             }
         }
+    }
+
+    @Override
+    public int compareTo(PyInt other) {
+        return (bigValue == null && other.bigValue == null)? Long.compare(smallValue, other.smallValue)
+                : bigIntegerValue().compareTo(other.bigIntegerValue());
     }
 }

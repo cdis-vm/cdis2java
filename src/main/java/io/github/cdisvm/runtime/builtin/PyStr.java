@@ -26,7 +26,7 @@ import io.github.cdisvm.runtime.util.DefaultFormatSpec;
 
 @PyBuiltin("str")
 public record PyStr(String value) implements PyConstant, PyContainer, PyAddable, PyFormattable,
-        PyAsciiable, PyGettable, PyHasEquals {
+        PyAsciiable, PyGettable, PyHasEquals, Comparable<PyStr> {
     public static PyType type;
 
     @PyConstructor
@@ -251,5 +251,10 @@ public record PyStr(String value) implements PyConstant, PyContainer, PyAddable,
             return new PyStr(value.substring(index, index + 1));
         }
         throw new PyTypeError("Invalid index (%s)".formatted(item));
+    }
+
+    @Override
+    public int compareTo(PyStr other) {
+        return value.compareTo(other.value);
     }
 }
