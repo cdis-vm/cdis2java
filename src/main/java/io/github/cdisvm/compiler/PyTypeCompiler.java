@@ -559,16 +559,10 @@ public class PyTypeCompiler {
                 codeBuilder.invokespecial(CD.of(PyDefaultTypeAttributes.class), "attributeNames", MD.of(Collection.class));
                 codeBuilder.invokespecial(CD.of(ArrayList.class), "<init>", MD.of(void.class, Collection.class));
                 for (var attr : classInfo.classAttributeToType().keySet()) {
-                    codeBuilder.aload(0);
-                    codeBuilder.invokevirtual(classDesc, getAttributeDesc(attr).getter(), MD.of(PyObject.class));
-                    codeBuilder.aconst_null();
-                    var skip = codeBuilder.newLabel();
-                    codeBuilder.if_acmpeq(skip);
                     codeBuilder.dup();
                     codeBuilder.loadConstant(attr);
                     codeBuilder.invokevirtual(CD.of(ArrayList.class), "add", MD.of(boolean.class, Object.class));
                     codeBuilder.pop();
-                    codeBuilder.labelBinding(skip);
                 }
                 codeBuilder.areturn();
             });
@@ -771,16 +765,10 @@ public class PyTypeCompiler {
                 codeBuilder.invokespecial(CD.of(PyDefaultInstanceAttributes.class), "attributeNames", MD.of(Collection.class));
                 codeBuilder.invokespecial(CD.of(ArrayList.class), "<init>", MD.of(void.class, Collection.class));
                 for (var attr : classInfo.instanceAttributeToType().keySet()) {
-                    codeBuilder.aload(0);
-                    codeBuilder.invokevirtual(classDesc, getAttributeDesc(attr).getter(), MD.of(PyObject.class));
-                    codeBuilder.aconst_null();
-                    var skip = codeBuilder.newLabel();
-                    codeBuilder.if_acmpeq(skip);
                     codeBuilder.dup();
                     codeBuilder.loadConstant(attr);
                     codeBuilder.invokevirtual(CD.of(ArrayList.class), "add", MD.of(boolean.class, Object.class));
                     codeBuilder.pop();
-                    codeBuilder.labelBinding(skip);
                 }
                 codeBuilder.areturn();
             });
