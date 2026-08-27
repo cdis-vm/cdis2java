@@ -20,13 +20,15 @@ import io.github.cdisvm.runtime.annotation.PyBuiltin;
 import io.github.cdisvm.runtime.annotation.PyConstructor;
 import io.github.cdisvm.runtime.binary.PyAddable;
 import io.github.cdisvm.runtime.comparison.PyHasEquals;
+import io.github.cdisvm.runtime.comparison.PyHasGreaterThan;
+import io.github.cdisvm.runtime.comparison.PyHasLessThan;
 import io.github.cdisvm.runtime.exception.PyTypeError;
 import io.github.cdisvm.runtime.exception.PyValueError;
 import io.github.cdisvm.runtime.util.DefaultFormatSpec;
 
 @PyBuiltin("str")
 public record PyStr(String value) implements PyConstant, PyContainer, PyAddable, PyFormattable,
-        PyAsciiable, PyGettable, PyHasEquals {
+        PyAsciiable, PyGettable, PyHasEquals, PyHasLessThan {
     public static PyType type;
 
     @PyConstructor
@@ -251,5 +253,13 @@ public record PyStr(String value) implements PyConstant, PyContainer, PyAddable,
             return new PyStr(value.substring(index, index + 1));
         }
         throw new PyTypeError("Invalid index (%s)".formatted(item));
+    }
+
+    @Override
+    public PyObject pyLessThan(PyObject other) {
+        if (other instanceof PyStr(String value1)) {
+            return PyBool.of(value1.compareTo(value) < 0);
+        }
+        return PyNotImplemented.INSTANCE;
     }
 }

@@ -30,14 +30,14 @@ public interface PyObject extends Comparable<PyObject> {
     default int compareTo(PyObject other) {
         var lessThanResult = PyHasLessThan.lessThanResult(this, other);
         if (lessThanResult == PyNotImplemented.INSTANCE) {
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(this + " cannot be compared with " + other);
         }
         if (lessThanResult.pyTruth().value()) {
             return -1;
         }
         lessThanResult = PyHasLessThan.lessThanResult(other, this);
         if (lessThanResult == PyNotImplemented.INSTANCE) {
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(other + " cannot be compared with " + this);
         }
         if (lessThanResult.pyTruth().value()) {
             return 1;
