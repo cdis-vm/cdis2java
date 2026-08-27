@@ -1,6 +1,7 @@
 package io.github.cdisvm.runtime.builtin;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,9 @@ public class PyDefaultAttributes implements PyAttributes {
 
     @Override
     public Collection<String> attributeNames() {
+        if (attributeToValue == null) {
+            return Collections.emptyList();
+        }
         return attributeToValue.keySet();
     }
 
