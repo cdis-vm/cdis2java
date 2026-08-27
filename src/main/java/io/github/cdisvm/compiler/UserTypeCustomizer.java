@@ -17,6 +17,7 @@ import java.util.Map;
 
 import io.github.cdisvm.runtime.PyAttributes;
 import io.github.cdisvm.runtime.PyObject;
+import io.github.cdisvm.runtime.builtin.PyNone;
 
 public record UserTypeCustomizer(
         CDisCompiler compiler,
@@ -84,7 +85,15 @@ public record UserTypeCustomizer(
                 var attrDesc = compiler.getAttributeDesc(propertyName);
                 codeBuilder.checkcast(attrDesc.interfaceDesc());
                 codeBuilder.invokeinterface(attrDesc.interfaceDesc(), attrDesc.getter(), MD.of(PyObject.class));
+                codeBuilder.dup();
+                PyNone.INSTANCE.loadValueOntoStack(codeBuilder);
+                var isNull = codeBuilder.newLabel();
+                codeBuilder.if_acmpeq(isNull);
                 codeBuilder.checkcast(typeDesc);
+                codeBuilder.areturn();
+                codeBuilder.labelBinding(isNull);
+                codeBuilder.pop();
+                codeBuilder.aconst_null();
                 codeBuilder.areturn();
             });
         });
@@ -96,7 +105,15 @@ public record UserTypeCustomizer(
             var attrDesc = compiler.getAttributeDesc(propertyName);
             codeBuilder.checkcast(attrDesc.interfaceDesc());
             codeBuilder.aload(1);
+            codeBuilder.aconst_null();
+            var isNull = codeBuilder.newLabel();
+            codeBuilder.if_acmpeq(isNull);
+            codeBuilder.aload(1);
             codeBuilder.checkcast(CD.PY_OBJECT);
+            codeBuilder.invokeinterface(attrDesc.interfaceDesc(), attrDesc.setter(), MD.of(void.class, PyObject.class));
+            codeBuilder.return_();
+            codeBuilder.labelBinding(isNull);
+            PyNone.INSTANCE.loadValueOntoStack(codeBuilder);
             codeBuilder.invokeinterface(attrDesc.interfaceDesc(), attrDesc.setter(), MD.of(void.class, PyObject.class));
             codeBuilder.return_();
         });
@@ -121,7 +138,15 @@ public record UserTypeCustomizer(
                 var attrDesc = compiler.getAttributeDesc(propertyName);
                 codeBuilder.checkcast(attrDesc.interfaceDesc());
                 codeBuilder.invokeinterface(attrDesc.interfaceDesc(), attrDesc.getter(), MD.of(PyObject.class));
+                codeBuilder.dup();
+                PyNone.INSTANCE.loadValueOntoStack(codeBuilder);
+                var isNull = codeBuilder.newLabel();
+                codeBuilder.if_acmpeq(isNull);
                 codeBuilder.checkcast(CD.of(List.class));
+                codeBuilder.areturn();
+                codeBuilder.labelBinding(isNull);
+                codeBuilder.pop();
+                codeBuilder.aconst_null();
                 codeBuilder.areturn();
             });
         });
@@ -130,6 +155,11 @@ public record UserTypeCustomizer(
             methodBuilder.accept(SignatureAttribute.of(
                     MethodSignature.parseFrom("(Ljava/util/List<%s>;)V".formatted(typeDesc.descriptorString()))));
             methodBuilder.withCode(codeBuilder -> {
+                codeBuilder.aload(1);
+                codeBuilder.aconst_null();
+                var isNull = codeBuilder.newLabel();
+                codeBuilder.if_acmpeq(isNull);
+
                 codeBuilder.aload(0);
                 codeBuilder.checkcast(CD.PY_OBJECT);
                 codeBuilder.invokeinterface(CD.PY_OBJECT, "pyAttributes", MD.of(PyAttributes.class));
@@ -139,6 +169,15 @@ public record UserTypeCustomizer(
                 codeBuilder.dup();
                 codeBuilder.aload(1);
                 codeBuilder.invokespecial(CD.PY_LIST, "<init>", MD.of(void.class, List.class));
+                codeBuilder.invokeinterface(attrDesc.interfaceDesc(), attrDesc.setter(), MD.of(void.class, PyObject.class));
+                codeBuilder.return_();
+
+                codeBuilder.labelBinding(isNull);
+                codeBuilder.aload(0);
+                codeBuilder.checkcast(CD.PY_OBJECT);
+                codeBuilder.invokeinterface(CD.PY_OBJECT, "pyAttributes", MD.of(PyAttributes.class));
+                codeBuilder.checkcast(attrDesc.interfaceDesc());
+                PyNone.INSTANCE.loadValueOntoStack(codeBuilder);
                 codeBuilder.invokeinterface(attrDesc.interfaceDesc(), attrDesc.setter(), MD.of(void.class, PyObject.class));
                 codeBuilder.return_();
             });
