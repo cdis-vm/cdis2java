@@ -556,7 +556,7 @@ public class PyTypeCompiler {
                 codeBuilder.new_(CD.of(ArrayList.class));
                 codeBuilder.dup();
                 codeBuilder.aload(0);
-                codeBuilder.invokeinterface(CD.of(PyAttributes.class), "attributeNames", MD.of(Collection.class));
+                codeBuilder.invokespecial(CD.of(PyDefaultTypeAttributes.class), "attributeNames", MD.of(Collection.class));
                 codeBuilder.invokespecial(CD.of(ArrayList.class), "<init>", MD.of(void.class, Collection.class));
                 for (var attr : classInfo.classAttributeToType().keySet()) {
                     codeBuilder.aload(0);
@@ -768,7 +768,7 @@ public class PyTypeCompiler {
                 codeBuilder.new_(CD.of(ArrayList.class));
                 codeBuilder.dup();
                 codeBuilder.aload(0);
-                codeBuilder.invokeinterface(CD.of(PyAttributes.class), "attributeNames", MD.of(Collection.class));
+                codeBuilder.invokespecial(CD.of(PyDefaultInstanceAttributes.class), "attributeNames", MD.of(Collection.class));
                 codeBuilder.invokespecial(CD.of(ArrayList.class), "<init>", MD.of(void.class, Collection.class));
                 for (var attr : classInfo.instanceAttributeToType().keySet()) {
                     codeBuilder.aload(0);
