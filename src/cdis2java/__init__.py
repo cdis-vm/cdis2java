@@ -1,3 +1,9 @@
+import importlib.resources
+import os
+import shutil
+import tempfile
+from pathlib import Path
+
 import jpype
 import jpype.imports
 import inspect
@@ -7,11 +13,53 @@ from cdis.compiler._api import to_bytecode, Bytecode
 import cdis.opcode as opcode
 from cdis.opcode import ClassInfo
 
+_JAR_NAME = "cdis2java-999-SNAPSHOT.jar"
+_extracted_jar_path = None
+
 compiler = None
 
-def start_jvm(jar_path):
+
+def get_jar_path():
+    global _extracted_jar_path
+    if _extracted_jar_path is not None:
+        return _extracted_jar_path
+    try:
+        resource = importlib.resources.files(__name__).joinpath(_JAR_NAME)
+        cache_dir = Path(tempfile.gettempdir()) / "cdis2java"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        dest = cache_dir / _JAR_NAME
+        with importlib.resources.as_file(resource) as source:
+            tmp = dest.with_name(dest.name + ".tmp")
+            shutil.copy2(source, tmp)
+            os.replace(tmp, dest)
+        _extracted_jar_path = str(dest)
+        return _extracted_jar_path
+    except (FileNotFoundError, LookupError):
+        pass
+    fallback = os.path.abspath(os.path.join("target", _JAR_NAME))
+    if os.path.isfile(fallback):
+        _extracted_jar_path = fallback
+        return _extracted_jar_path
+    raise FileNotFoundError(
+        f"Could not locate {_JAR_NAME} inside the cdis2java package or in target/. "
+        "Run 'mvn package' or install the package from source."
+    )
+
+
+def _resolve_jar_path(jar_path):
+    return get_jar_path() if jar_path is None else jar_path
+
+
+def start_jvm(jar_path=None):
     if not jpype.isJVMStarted():
-        jpype.startJVM(classpath=[jar_path])
+        jpype.startJVM(classpath=[_resolve_jar_path(jar_path)])
+
+
+def start_jvm_with_extra_jars(extra_jars, jar_path=None):
+    if not jpype.isJVMStarted():
+        classpath = [_resolve_jar_path(jar_path)]
+        classpath.extend(extra_jars)
+        jpype.startJVM(classpath=classpath)
 
 
 def _jclass(name):
@@ -559,12 +607,13 @@ def compile_bytecode(bc,
     return compiler.compile(_convert_bytecode(bc, visited, outer_closure))
 
 
-def compile_function(func, visited=None, jar_path='target/cdis2java-999-SNAPSHOT.jar'):
+def compile_function(func, visited=None, jar_path=None):
     global compiler
-    start_jvm(jar_path)
+    resolved_jar = _resolve_jar_path(jar_path)
+    start_jvm(resolved_jar)
     JCDisCompiler = _jclass("io.github.cdisvm.compiler.CDisCompiler")
     if compiler is None:
-        compiler = JCDisCompiler(jar_path)
+        compiler = JCDisCompiler(resolved_jar)
     if visited is None:
         visited = set()
     py_bytecode = to_bytecode(func)
@@ -577,12 +626,13 @@ def lookup_class(cls):
     return compiler.lookupUserClass(cls.__qualname__)
 
 
-def customize_class(cls, customizer, jar_path='target/cdis2java-999-SNAPSHOT.jar'):
+def customize_class(cls, customizer, jar_path=None):
     global compiler
-    start_jvm(jar_path)
+    resolved_jar = _resolve_jar_path(jar_path)
+    start_jvm(resolved_jar)
     JCDisCompiler = _jclass("io.github.cdisvm.compiler.CDisCompiler")
     if compiler is None:
-        compiler = JCDisCompiler(jar_path)
+        compiler = JCDisCompiler(resolved_jar)
     class_info = _convert_class_info(cls, set())
     compiler.customizeUserType(class_info, customizer)
     return compiler.lookupUserClass(cls.__qualname__)

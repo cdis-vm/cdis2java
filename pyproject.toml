@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
 
 
 [project]
@@ -36,6 +36,15 @@ Issues = "https://github.com/cdis-vm/cdis2java/issues"
 
 [dependency-groups]
 dev = ["pytest>8", "coverage", "tox", "ruff"]
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["cdis2java*"]
+
+
+[tool.setuptools.package-data]
+cdis2java = ["*.jar"]
 
 
 [pytest]
